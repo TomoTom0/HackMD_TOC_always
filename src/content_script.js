@@ -7,10 +7,15 @@
 
 window.onload=function(){
     // insert toc-dropdown
-    const scroll_ver=$(".CodeMirror-overlayscroll-vertical");
     const div=$("<div>", {"class":"ui-toc-dropdown ui-affix-toc unselectable hidden-print"})
     .css({"max-height":"", "background-color":"transparent", overflow:"hidden", margin:"",
      right:"10px" , top:"0", width:"140px", "border":"none", height:"30%"});
+
+    let scroll_ver=$(".CodeMirror-overlayscroll-vertical");
+    if (scroll_ver.length==0) {
+        scroll_ver=$("div.CodeMirror-vscrollbar");
+        div.css({"top": 50})
+    }
     scroll_ver.append(div);
     // adjust scroll bar
     const scbar=$(".CodeMirror-overlayscroll-vertical div:eq(0)");
@@ -28,9 +33,10 @@ window.onload=function(){
 }
 
 function remake_TOC(){
-    const scroll_ver=$(".CodeMirror-overlayscroll-vertical");
+    let scroll_ver=$(".CodeMirror-overlayscroll-vertical");
+    if (scroll_ver.length==0) scroll_ver=$("div.CodeMirror-vscrollbar")
     const div=$(".ui-toc-dropdown", scroll_ver);
-    $("#toc_out_ChEx",div).remove(); // div.empty();
+    $("#toc_out_ChEx").remove(); // div.empty();
 
     const css_dic={"max-height":"","background":"white", opacity:"0.3","border":"none",
     height:"auto", "z-index":"100"};
