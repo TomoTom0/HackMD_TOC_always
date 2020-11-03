@@ -4,7 +4,6 @@
   "version": "0.2",
   "icons":{"48":"img/chrome_reader_mode_black_48dp.png"},
   "manifest_version": 2,
-  "content_security_policy": "script-src 'self'",
   "content_scripts": [{
     "matches": ["https://hackmd.io/*"],
     "exclude_matches":["https://hackmd.io/*?nav=overview"],

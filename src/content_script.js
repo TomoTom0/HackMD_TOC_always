@@ -1,7 +1,7 @@
 ﻿$(function () {
-
-    document.addEventListener("keypress", remake_TOC());
-
+    const inter=setInterval(function(){
+        remake_TOC();
+    }, 100);
 });
 
 
