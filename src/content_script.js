@@ -1,7 +1,7 @@
 ﻿$(function () {
     const inter=setInterval(function(){
-        remake_TOC();
-    }, 100);
+        addEventListener("keypress", remake_TOC)
+    }, 300);
 });
 
 
@@ -10,7 +10,7 @@ window.onload=function(){
     const scroll_ver=$(".CodeMirror-overlayscroll-vertical");
     const div=$("<div>", {"class":"ui-toc-dropdown ui-affix-toc unselectable hidden-print"})
     .css({"max-height":"", "background-color":"transparent", overflow:"hidden", margin:"",
-     right:"10px" , top:"0", width:"120px", "border":"none", height:"30%"});
+     right:"10px" , top:"0", width:"140px", "border":"none", height:"30%"});
     scroll_ver.append(div);
     // adjust scroll bar
     const scbar=$(".CodeMirror-overlayscroll-vertical div:eq(0)");
