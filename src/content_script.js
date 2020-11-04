@@ -1,9 +1,10 @@
 ﻿$(function () {
     const inter=setInterval(function(){
-        addEventListener("keypress", remake_TOC)
-    }, 300);
+        remake_TOC();
+    }, 30000);
 });
 
+addEventListener("keypress", remake_TOC);
 
 window.onload=function(){
     // insert toc-dropdown
@@ -34,7 +35,7 @@ window.onload=function(){
 
 function remake_TOC(){
     let scroll_ver=$(".CodeMirror-overlayscroll-vertical");
-    if (scroll_ver.length==0) scroll_ver=$("div.CodeMirror-vscrollbar")
+    if (scroll_ver.length==0) scroll_ver=$("div.CodeMirror-vscrollbar");
     const div=$(".ui-toc-dropdown", scroll_ver);
     $("#toc_out_ChEx").remove(); // div.empty();
 
@@ -53,7 +54,7 @@ function remake_TOC(){
 
 function addButtons(){
     const navi_bar=$("div.collapse.navbar-collapse .navbar-left:eq(1)");
-    const a_ids=["expand_toggle", "back_to_top", "go_to_bottom"];
+    //const a_ids=["expand_toggle", "back_to_top", "go_to_bottom"];
     const img_paths=["img/unfold_less_black_48dp.png", "img/north_black_48dp.png", "img/south_black_48dp.png"];
     $(".li_tmp", navi_bar).each((ind, elem)=>$(elem).remove());
 
