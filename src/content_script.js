@@ -15,7 +15,7 @@ document.addEventListener("click", async function (e) {
         GLOBAL_var.hide=!GLOBAL_var.hide;
     }
     else if (/menu_adjustTOC_opacity/.test($(e.target).attr("class")) ) {
-        $(".go-to-bottom:eq(0)").trigger("click");
+        
         GLOBAL_var.opacity=GLOBAL_var.opacity <= 0.5 ? GLOBAL_var.opacity*2 : 0.25;
     }
     else if (/menu_adjustTOC_width/.test($(e.target).attr("class")) ) {
@@ -34,7 +34,7 @@ document.addEventListener("click", async function (e) {
 window.onload=function(){
     // insert toc-dropdown
     const div=$("<div>", {"class":"ui-toc-dropdown ui-affix-toc unselectable hidden-print"})
-    .css({"max-height":"", "background-color":"transparent", overflow:"hidden", margin:"",
+    .css({"max-height":"", "background-color":"transparent", overflow:"hidden", margin:"5px",
      right:"10px" , top:"0", width:`${GLOBAL_var.width}px`, "border":"none", height:"30%"});
 
     let scroll_ver=$(".CodeMirror-overlayscroll-vertical");
@@ -67,7 +67,7 @@ function remake_TOC(){
 
     if (GLOBAL_var.hide) return;
     const css_dic={"max-height":"","background":"white", opacity:GLOBAL_var.opacity,"border":"none",
-    height:"auto", "z-index":"100", width:`${GLOBAL_var.width}px`};
+    height:"auto", "z-index":"100"};
 
     const toc=$(".ui-view-area #ui-toc-affix .toc");
     toc.addClass("toc-expand");
@@ -80,16 +80,16 @@ function remake_TOC(){
 }
 
 function addButtons(){
-    const navi_bar=$("div.collapse.navbar-collapse .navbar-left:eq(1)");
-    //const a_ids=["expand_toggle", "back_to_top", "go_to_bottom"];
+    const navibar_class="div.collapse.navbar-collapse";
+    const navi_bar=$(`${navibar_class} .navbar-left:eq(1)`).length>0 ?
+        $(`${navibar_class} .navbar-left:eq(1)`) : $(`div.navbar-header .nav-mobile.pull-right:eq(1)`);
+    const a_ids=["expand_toggle", "back_to_top", "go_to_bottom"];
     const img_paths=["img/unfold_less_black_48dp.png", "img/north_black_48dp.png", "img/south_black_48dp.png"];
     $(".li_tmp", navi_bar).each((ind, elem)=>$(elem).remove());
 
-    [`<a class="expand-toggle" href="#">全部見る</a>`,
-    `<a class="back-to-top" href="#">トップへ戻る</a>`,
-    `<a class="go-to-bottom" href="#">底へ移る</a>`]
-    .map((d, ind)=>{
-        const elem=$("<a>", {href:"#"});
+    /*a_ids.map((a_id, ind)=>{
+        if (ind > 2) return;
+        const elem=$("<a>", {href:"#", class:a_id});
         const img_path=chrome.runtime.getURL(img_paths[ind]);
         const img_tmp=$("<img>", {src:img_path, height:20});
         const li_tmp=$("<li>", {"data-offset":"0,5", class:"li_tmp"});
@@ -97,7 +97,7 @@ function addButtons(){
         $(elem).append(img_tmp);
         li_tmp.append($(elem).attr({class:"extension_add_button"}));
         navi_bar.append(li_tmp);
-    })
+    })*/
 }
 
 function addMenuButton(){
