@@ -1,6 +1,6 @@
 {
-  "name": "HackMD_TOC_always",
-  "description": "This extension can enable you to view HackMD's TOC in sidebar even in edit or split-view mode.",
+  "name": "HackMD TOC always",
+  "description": "With this extension in HackMD, you can see TOC even in edit or split-view mode.",
   "version": "1.0.0.0",
   "icons":{"48":"img/chrome_reader_mode_black_48dp.png"},
   "manifest_version": 2,

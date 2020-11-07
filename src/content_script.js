@@ -33,21 +33,30 @@ document.addEventListener("click", async function (e) {
     } // navi bar button
     if (/naviTOC_button/.test(e_class)){
         if (/expand_toggle/.test(e_class)){
+            GLOBAL_var.expand=!GLOBAL_var.expand;
             $(".toc").each((ind, elem)=>{
-                GLOBAL_var.expand=!GLOBAL_var.expand;
                 if ($(elem).attr("class").split(" ").indexOf("expand")!=-1) $(elem).removeClass("expand");
                 else $(elem).addClass("expand");
             })
+            remake_TOC();
         } else if (/back_to_top/.test(e_class)){
-            EditorScroll(0);
+            if (location.href.indexOf("?edit")!=-1) EditScroll(0);
+            else if(location.href.indexOf("?both")!=-1) ViewScroll(0);
+            else $("html, body").stop(true, true).animate({
+                scrollTop: 0
+              }, 100, 'linear');
         } else if (/go_to_bottom/.test(e_class)){
             const posBottom= $(".CodeMirror-sizer").css("min-height").replace("px", "")
             -$(".CodeMirror-lines").css("padding-bottom").replace("px", "")
-            -$(".CodeMirror-scroll").height()*0.3;
-            EditorScroll(posBottom);
+            -$(".CodeMirror-scroll").height();
+            if (location.href.indexOf("?edit")!=-1) EditScroll(posBottom);
+            else if(location.href.indexOf("?both")!=-1) ViewScroll($(".ui-view-area .markdown-body").height());
+            else $("html, body").stop(true, true).animate({
+                scrollTop: $(".ui-view-area .markdown-body").height()
+              }, 100, 'linear');
         }
     }
-    if ($(e.target).parents("#toc_out_ChEx").length>0 && GLOBAL_now_href.indexOf("?edit")!=-1){
+    if ($(e.target).parents("#toc_out_ChEx").length>0 && location.href.indexOf("?edit")!=-1){
         const href_id=$(e.target).attr("href").match(/(?<=^#).*/);
         const line_num=$(`#${href_id}`).attr("data-startline")-0;
         const line_hegiht=$(".CodeMirror>div>textarea").css("height").replace("px", "");
@@ -77,10 +86,16 @@ window.onload=function(){
     }, 500);
 }
 
-function EditorScroll(posTo=0){
+function EditScroll(posTo=0){
     $(".CodeMirror-scroll").stop(true, true).animate({
         scrollTop: posTo
       }, 100, 'linear');
+}
+
+function ViewScroll(posTo=0){
+    $(".ui-view-area").stop(true, true).animate({
+        scrollTop: posTo
+      }, 100, 'linear')
 }
 
 function remake_TOC(){
@@ -96,7 +111,7 @@ function remake_TOC(){
      opacity:GLOBAL_var.opacity,"border":"none", width:`${GLOBAL_var.width-10}px`,
     height:"auto", "z-index":"100"};
     const toc_view=$(".ui-view-area #ui-toc-affix .toc");
-    const toc_out=$("<div>", {class:"toc"});
+    const toc_out=$("<div>");
     toc_out.html(toc_view.html());
     div_toc.append(toc_out.attr({class:GLOBAL_var.expand ? "toc expand" : "toc", id:"toc_out_ChEx"})
     .css({...css_dic}));
