@@ -10,8 +10,9 @@ $(function () {
 addEventListener("keypress", remake_TOC);
 
 document.addEventListener("click", async function (e) {
-    console.log("clicked", e.target);
     const e_class=$(e.target).attr("class");
+    const mode={edit:$(".ui-edit-area").css("display")!="none",
+        view:$(".ui-view-area").css("display")!="none"};
     // if change mode, remake TOC
     if (GLOBAL_now_href!= location.href) {
         remake_TOC();
@@ -40,8 +41,8 @@ document.addEventListener("click", async function (e) {
             })
             remake_TOC();
         } else if (/back_to_top/.test(e_class)){
-            if (location.href.indexOf("?edit")!=-1) EditScroll(0);
-            else if(location.href.indexOf("?both")!=-1) ViewScroll(0);
+            if (mode.edit && !mode.view) EditScroll(0);
+            else if(mode.edit && mode.view) ViewScroll(0);
             else $("html, body").stop(true, true).animate({
                 scrollTop: 0
               }, 100, 'linear');
@@ -49,18 +50,18 @@ document.addEventListener("click", async function (e) {
             const posBottom= $(".CodeMirror-sizer").css("min-height").replace("px", "")
             -$(".CodeMirror-lines").css("padding-bottom").replace("px", "")
             -$(".CodeMirror-scroll").height();
-            if (location.href.indexOf("?edit")!=-1) EditScroll(posBottom);
-            else if(location.href.indexOf("?both")!=-1) ViewScroll($(".ui-view-area .markdown-body").height());
+            if (mode.edit && ! mode.view) EditScroll(posBottom);
+            else if(mode.edit && mode.view) ViewScroll($(".ui-view-area .markdown-body").height());
             else $("html, body").stop(true, true).animate({
                 scrollTop: $(".ui-view-area .markdown-body").height()
               }, 100, 'linear');
         }
     }
-    if ($(e.target).parents("#toc_out_ChEx").length>0 && location.href.indexOf("?edit")!=-1){
+    if ($(e.target).parents("#toc_out_ChEx").length>0 && mode.edit && !mode.view){
         const href_id=$(e.target).attr("href").match(/(?<=^#).*/);
         const line_num=$(`#${href_id}`).attr("data-startline")-0;
         const line_hegiht=$(".CodeMirror>div>textarea").css("height").replace("px", "");
-        EditorScroll(line_num*line_hegiht*1.2-15);
+        EditScroll(line_num*line_hegiht*1.2-15);
     }
 })
 
@@ -127,12 +128,9 @@ function addNaviButtons(){
     $(".li_naviTOC", navi_bar).each((ind, elem)=>$(elem).remove());
 
     a_ids.map((a_id, ind)=>{
-        //const a_button=$(`.toc-menu:eq(0) a:eq(${ind})`);
         const img_path=chrome.runtime.getURL(img_paths[ind]);
         const img_tmp=$("<img>", {src:img_path, height:15, class:`naviTOC_button ${a_id}`});
         const li_tmp=$("<li>", {class:`li_naviTOC`});
-        //const label_tmp=$("<label>", {for: `id_${a_id}`});
-        //label_tmp.append($("<a>", {href:"#"}).append(img_tmp));
         li_tmp.append($("<a>", {href:"#", class:`naviTOC_button ${a_id}`}).append(img_tmp));
         navi_bar.append(li_tmp);
     })
