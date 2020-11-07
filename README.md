@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This extension can enable you to view HackMD's TOC in sidebar even in edit or split-view mode.
+With this extension in HackMD, you can see TOC even in edit or split-view mode.
 
 ![](img/Hack_ss1.png)
 ![](img/Hack_ss2.png)
