@@ -2,11 +2,13 @@
 let GLOBAL_now_href=location.href;
 
 $(function () {
+    // remake TOC per 1 minutes
     setInterval(function(){
         remake_TOC();
     }, 60000);
 });
 
+// if keypress -> remake TOC
 addEventListener("keypress", remake_TOC);
 
 document.addEventListener("click", async function (e) {
@@ -56,7 +58,7 @@ document.addEventListener("click", async function (e) {
                 scrollTop: $(".ui-view-area .markdown-body").height()
               }, 100, 'linear');
         }
-    }
+    } // toc jump in edit mode
     if ($(e.target).parents("#toc_out_ChEx").length>0 && mode.edit && !mode.view){
         const href_id=$(e.target).attr("href").match(/(?<=^#).*/);
         const line_num=$(`#${href_id}`).attr("data-startline")-0;
@@ -66,6 +68,7 @@ document.addEventListener("click", async function (e) {
 })
 
 window.onload=function(){
+    // make new scrollbar area for toc
     const cm=$(".CodeMirror.cm-s-one-dark.CodeMirror-wrap");
     const scroll_ver=$("<div>", {class:"CodeMirror-overlayscroll-vertical",
         style:`width: ${GLOBAL_var.width-10}px; z-index:100;`, "cm-not-content":"true",
@@ -81,6 +84,7 @@ window.onload=function(){
     const inter=setInterval(function(){
         remake_TOC();
         addNaviButtons();
+        // check valid toc exists or not
         if ($("#toc_out_ChEx").html()!=""){
             clearInterval(inter);
         }
@@ -100,20 +104,21 @@ function ViewScroll(posTo=0){
 }
 
 function remake_TOC(){
+    // scrollbar area for TOC
     const scroll_ver=$("#scbar_vertical_forTOC");
     const div_toc=$(".ui-toc-dropdown", scroll_ver);
     scroll_ver.css({"max-width":`${GLOBAL_var.width}px`,
      width:`${GLOBAL_var.width}px`});
     div_toc.css({"max-width":`${GLOBAL_var.width}px`,
      width:`${GLOBAL_var.width}px`});
-    $("#toc_out_ChEx").remove(); // div.empty();
-    if (GLOBAL_var.hide) return;
+    $("#toc_out_ChEx").remove(); // avoid double toc;
+    if (GLOBAL_var.hide) return; // hide check
     const css_dic={"max-height":"","background":"white",
      opacity:GLOBAL_var.opacity,"border":"none", width:`${GLOBAL_var.width-10}px`,
     height:"auto", "z-index":"100"};
     const toc_view=$(".ui-view-area #ui-toc-affix .toc");
     const toc_out=$("<div>");
-    toc_out.html(toc_view.html());
+    toc_out.html(toc_view.html()); // copy toc
     div_toc.append(toc_out.attr({class:GLOBAL_var.expand ? "toc expand" : "toc", id:"toc_out_ChEx"})
     .css({...css_dic}));
     div_toc.css({height:toc_out.height()})
@@ -125,6 +130,7 @@ function addNaviButtons(){
         $(`${navibar_class} .navbar-left:eq(1)`) : $(`div.navbar-header .nav-mobile.pull-right:eq(1)`);
     const a_ids=["expand_toggle", "back_to_top", "go_to_bottom"];
     const img_paths=["img/unfold_less_black_48dp.png", "img/north_black_48dp.png", "img/south_black_48dp.png"];
+    // avoid double contents
     $(".li_naviTOC", navi_bar).each((ind, elem)=>$(elem).remove());
 
     a_ids.map((a_id, ind)=>{
