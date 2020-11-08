@@ -4,8 +4,7 @@
 
 With this extension in HackMD, you can see TOC even in edit or split-view mode.
 
-![](img/Hack_ss1.png)
-![](img/Hack_ss2.png)
+![](img/HackMDtoc_gif.gif)
 
 ## Features
 These features work in every mode.
