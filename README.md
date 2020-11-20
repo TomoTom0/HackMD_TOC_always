@@ -23,10 +23,9 @@ adjust TOC in menu
 ![](img/HackMDTOC_ss3.png)
 
 
-### Problems
+## Contact Me
 
-- ~~additional buttons in navi bar don't work in Edit mode (because they are from components in view-area)~~
-- ~~if click content of TOC in edit mode, the window won't move it. (This is bacuase of the default feature of CodeMirror)~~
+- Gmail: TomoIris427+GitHub@gmail.com
 
 ## License
 
