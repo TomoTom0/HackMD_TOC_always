@@ -38,8 +38,8 @@ document.addEventListener("click", async function (e) {
         if (/expand_toggle/.test(e_class)){
             GLOBAL_var.expand=!GLOBAL_var.expand;
             $(".toc").each((ind, elem)=>{
-                if ($(elem).attr("class").split(" ").indexOf("expand")!=-1) $(elem).removeClass("expand");
-                else $(elem).addClass("expand");
+                if (!GLOBAL_var.expand && $(elem).attr("class").split(" ").indexOf("expand")!=-1) $(elem).removeClass("expand");
+                else if (GLOBAL_var.expand) $(elem).addClass("expand");
             })
             remake_TOC();
         } else if (/back_to_top/.test(e_class)){
