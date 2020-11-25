@@ -1,11 +1,15 @@
-﻿let GLOBAL_var={opacity:0.5, hide:false, width:150, expand:true};
+﻿const default_settings={opacity:0.5, hide:false, width:150, expand:true};
+let GLOBAL_settings;
+chrome.storage.sync.get(default_settings, items=>{
+    GLOBAL_settings=items;
+})
 let GLOBAL_now_href=location.href;
 
 $(function () {
     // remake TOC per 1 minutes
     setInterval(function(){
         remake_TOC();
-    }, 60000);
+    }, 60*1000);
 });
 
 // if keypress -> remake TOC
@@ -23,25 +27,27 @@ document.addEventListener("click", async function (e) {
     } //adjust TOC
     if (/menu_TOCAlways/.test(e_class)){
         if (/menu_hideTOC/.test(e_class)) {
-            $(e.target).text(GLOBAL_var.hide ? "Hide TOC" : "Show TOC")
-            GLOBAL_var.hide=!GLOBAL_var.hide;
+            $(e.target).text(GLOBAL_settings.hide ? "Hide TOC" : "Show TOC")
+            GLOBAL_settings.hide=!GLOBAL_settings.hide;
         } else if (/menu_adjustTOC_opacity/.test(e_class) ) {
-            GLOBAL_var.opacity=GLOBAL_var.opacity <= 0.5 ? GLOBAL_var.opacity*2 : 0.25;
+            GLOBAL_settings.opacity=GLOBAL_settings.opacity <= 0.5 ? GLOBAL_settings.opacity*2 : 0.25;
         } else if (/menu_adjustTOC_width/.test(e_class) ) {
-            GLOBAL_var.width=GLOBAL_var.width <= 150 ? GLOBAL_var.width + 50 : 100 ;
+            GLOBAL_settings.width=GLOBAL_settings.width <= 150 ? GLOBAL_settings.width + 50 : 100 ;
         }
+        chrome.storage.sync.set(GLOBAL_settings);
         remake_TOC();
         $(".sidenav.main-sidenav").removeClass("in");
         $(".sidenav.sidenav-menu").removeClass("in");
     } // navi bar button
     if (/naviTOC_button/.test(e_class)){
         if (/expand_toggle/.test(e_class)){
-            GLOBAL_var.expand=!GLOBAL_var.expand;
+            GLOBAL_settings.expand=!GLOBAL_settings.expand;
             $(".toc").each((ind, elem)=>{
-                if (!GLOBAL_var.expand && $(elem).attr("class").split(" ").indexOf("expand")!=-1) $(elem).removeClass("expand");
-                else if (GLOBAL_var.expand) $(elem).addClass("expand");
+                if (!GLOBAL_settings.expand && $(elem).attr("class").split(" ").indexOf("expand")!=-1) $(elem).removeClass("expand");
+                else if (GLOBAL_settings.expand) $(elem).addClass("expand");
             })
             remake_TOC();
+            chrome.storage.sync.set(GLOBAL_settings);
         } else if (/back_to_top/.test(e_class)){
             if (mode.edit && !mode.view) EditScroll(0);
             else if(mode.edit && mode.view) ViewScroll(0);
@@ -71,13 +77,13 @@ window.onload=function(){
     // make new scrollbar area for toc
     const cm=$(".CodeMirror.cm-s-one-dark.CodeMirror-wrap");
     const scroll_ver=$("<div>", {class:"CodeMirror-overlayscroll-vertical",
-        style:`width: ${GLOBAL_var.width-10}px; z-index:100;`, "cm-not-content":"true",
+        style:`width: ${GLOBAL_settings.width-10}px; z-index:100;`, "cm-not-content":"true",
         id:"scbar_vertical_forTOC"})
     cm.prepend(scroll_ver);
     // insert toc-dropdown
     const div_toc=$("<div>", {"class":"ui-toc-dropdown ui-affix-toc unselectable hidden-print"})
     .css({"max-height":"", "background-color":"transparent", overflow:"hidden", margin:"5px",
-     right:"10px" , top:"0px", width:`${GLOBAL_var.width}px`, "border":"none", height:"30%"});
+     right:"10px" , top:"0px", width:`${GLOBAL_settings.width}px`, "border":"none", height:"30%"});
     scroll_ver.append(div_toc);
     // make TOC and TOC menu
     addMenuButton();
@@ -107,19 +113,19 @@ function remake_TOC(){
     // scrollbar area for TOC
     const scroll_ver=$("#scbar_vertical_forTOC");
     const div_toc=$(".ui-toc-dropdown", scroll_ver);
-    scroll_ver.css({"max-width":`${GLOBAL_var.width}px`,
-     width:`${GLOBAL_var.width}px`});
-    div_toc.css({"max-width":`${GLOBAL_var.width}px`,
-     width:`${GLOBAL_var.width}px`});
+    scroll_ver.css({"max-width":`${GLOBAL_settings.width}px`,
+     width:`${GLOBAL_settings.width}px`});
+    div_toc.css({"max-width":`${GLOBAL_settings.width}px`,
+     width:`${GLOBAL_settings.width}px`});
     $("#toc_out_ChEx").remove(); // avoid double toc;
-    if (GLOBAL_var.hide) return; // hide check
+    if (GLOBAL_settings.hide) return; // hide check
     const css_dic={"max-height":"","background":"white",
-     opacity:GLOBAL_var.opacity,"border":"none", width:`${GLOBAL_var.width-10}px`,
+     opacity:GLOBAL_settings.opacity,"border":"none", width:`${GLOBAL_settings.width-10}px`,
     height:"auto", "z-index":"100"};
     const toc_view=$(".ui-view-area #ui-toc-affix .toc");
     const toc_out=$("<div>");
     toc_out.html(toc_view.html()); // copy toc
-    div_toc.append(toc_out.attr({class:GLOBAL_var.expand ? "toc expand" : "toc", id:"toc_out_ChEx"})
+    div_toc.append(toc_out.attr({class:GLOBAL_settings.expand ? "toc expand" : "toc", id:"toc_out_ChEx"})
     .css({...css_dic}));
     div_toc.css({height:toc_out.height()})
 }

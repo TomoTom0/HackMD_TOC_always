@@ -9,6 +9,7 @@
     "exclude_matches":["https://hackmd.io/*?nav=*"],
     "js": ["jquery-3.5.1.min.js", "content_script.js"]
   }],
+  "permissions":["storage"],
   "web_accessible_resources":["img/*.png"],
   "options_page": "options.html"
 }
