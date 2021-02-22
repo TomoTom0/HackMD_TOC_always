@@ -1,7 +1,7 @@
 {
   "name": "HackMD TOC always",
   "description": "With this extension in HackMD, you can see TOC even in edit or split-view mode.",
-  "version": "1.0.0.2",
+  "version": "1.0.1.0",
   "icons":{"48":"img/chrome_reader_mode_black_48dp.png"},
   "manifest_version": 2,
   "content_scripts": [{
@@ -9,6 +9,10 @@
     "exclude_matches":["https://hackmd.io/*?nav=*"],
     "js": ["jquery-3.5.1.min.js", "content_script.js"]
   }],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "permissions":["storage"],
   "web_accessible_resources":["img/*.png"],
   "options_page": "options.html"
