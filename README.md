@@ -12,15 +12,15 @@ You can move by clicking an item in TOC
 
 ### navi-bar buttons
 add toc-menu buttons in navi-bar
-    - toggle-expand / back-to-top / go-to-bottom
+    - toggle-expand / back-to-top / go-to-bottom / open-adjust-dialog
 
 ### adjust TOC
-adjust TOC in menu
+adjust TOC in a modal dialog which you can open in the navi-bar icon
 - change opacity
 - change width
 - hide/show TOC
 
-![](img/HackMDTOC_ss3.png)
+![](img/HackMDTOC_ss4.png)
 
 
 ## Contact Me
