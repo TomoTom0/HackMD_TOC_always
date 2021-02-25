@@ -46,8 +46,7 @@ document.addEventListener("click", async function (e) {
         if (/expand_toggle/.test(e_class)) {
             GLOBAL_settings.expand = !GLOBAL_settings.expand;
             $(".toc").each((ind, elem) => {
-                if (!GLOBAL_settings.expand && $(elem).attr("class").split(" ").indexOf("expand") != -1) $(elem).removeClass("expand");
-                else if (GLOBAL_settings.expand) $(elem).addClass("expand");
+                $(elem).toggleClass("expand");
             })
             remake_TOC();
             chrome.storage.sync.set(GLOBAL_settings);
