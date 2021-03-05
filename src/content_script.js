@@ -1,4 +1,4 @@
-﻿const default_settings = { opacity: 0.5, hide: false, width: 150, expand: true };
+﻿const default_settings = { opacity: 0.5, hidden: false, width: 150, expand: true };
 
 const getSyncStorage = (key = null) => new Promise(resolve => {
     chrome.storage.sync.get(key, resolve);
@@ -51,18 +51,19 @@ $(function () {
             addNaviButtons();
             GLOBAL_now_href = location.href;
         } //adjust TOC
-        const GLOBAL_settings=await getSyncStorage(default_settings);
+        let GLOBAL_settings=await getSyncStorage(default_settings);
+        console.log(GLOBAL_settings)
         if (/menu_TOCAlways/.test(e_class)) {
             if (/menu_hideTOC/.test(e_class)) {
-                $(e.target).text(GLOBAL_settings.hidden ? "Hide TOC" : "Show TOC")
                 GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
+                $(e.target).text(GLOBAL_settings.hidden ? "Show TOC": "Hide TOC")
             } else if (/menu_adjustTOC_opacity/.test(e_class)) {
                 GLOBAL_settings.opacity = GLOBAL_settings.opacity <= 0.5 ? GLOBAL_settings.opacity * 2 : 0.25;
             } else if (/menu_adjustTOC_width/.test(e_class)) {
                 GLOBAL_settings.width = GLOBAL_settings.width <= 150 ? GLOBAL_settings.width + 50 : 100;
             }
-            chrome.storage.sync.set(GLOBAL_settings);
-            await remake_sampleTOC();
+            //await setSyncStorage(GLOBAL_settings);
+            await remake_sampleTOC(GLOBAL_settings);
             $(".sidenav.main-sidenav").removeClass("in");
             $(".sidenav.sidenav-menu").removeClass("in");
         } // navi bar button
@@ -106,20 +107,23 @@ $(function () {
             if (modal.length == 0) return;
             modal.attr({ style: "" }).removeClass("in");
         } else if (/btn_opacity/.test(e_class)) {
-            console.log(e.target)
             const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
             const opacityOrder = Math.min(4, Math.max(1, Math.floor(GLOBAL_settings.opacity / 0.25) + IsPls));
             GLOBAL_settings.opacity = opacityOrder * 0.25;
-            await remake_sampleTOC();
+            //await setSyncStorage(GLOBAL_settings);
+            await remake_sampleTOC(GLOBAL_settings);
         } else if (/btn_width/.test(e_class)) {
             const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
             const widthOrder = Math.min(4, Math.max(0, Math.floor((GLOBAL_settings.width-80)/30) + IsPls));
             GLOBAL_settings.width = widthOrder * 30 + 80;
-            await remake_sampleTOC();
-        } else if (/btn_menuTOCShowHide/.test(e_class)) {
+            //await setSyncStorage(GLOBAL_settings);
+            await remake_sampleTOC(GLOBAL_settings);
+        } else if ($(e.target).is("button.btn_menuTOCShowHide, button.btn_menuTOCShowHide *")) {
             GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
-            $(e.target).val(GLOBAL_settings.hidden ? "SHOW/hide" : "show/HIDE");
-            await remake_sampleTOC();
+            const showSpan=$("button.btn_menuTOCShowHide").parent().find("button.btn_menuTOCShowHide span");
+            showSpan.text(GLOBAL_settings.hidden ? "SHOW/hide" : "show/HIDE");
+            //await setSyncStorage(GLOBAL_settings);
+            await remake_sampleTOC(GLOBAL_settings);
         }
     })
     
@@ -170,20 +174,22 @@ function ViewScroll(posTo = 0) {
     }, 100, 'linear')
 }
 
-async function remake_sampleTOC() {
-    const GLOBAL_settings=await getSyncStorage(default_settings);
+async function remake_sampleTOC(GLOBAL_settingsIn=null) {
+    const GLOBAL_settings=GLOBAL_settingsIn || await getSyncStorage(default_settings);
     const sampleTOC = $(".toc-sample");
     ["opacity", "width"].forEach(key=>{
         const output=$(`.output_${key}Sample`);
         output.html(GLOBAL_settings[key]);
-    })
-    sampleTOC.css({ width: GLOBAL_settings.width - 10, opacity: GLOBAL_settings.opacity, visibility: (GLOBAL_settings.hidden) ? "hidden" : "visible" });
-    await remake_TOC();
-    chrome.storage.sync.set(GLOBAL_settings)
+    });
+    $("#sampleTOCTitle").text("# Sample"+(GLOBAL_settings.hidden ? ": Hidden" : ""));
+    sampleTOC.css({ width: GLOBAL_settings.width - 10,
+         opacity: GLOBAL_settings.opacity});
+    await remake_TOC(GLOBAL_settings);
+    await setSyncStorage(GLOBAL_settings);
 }
 
-async function remake_TOC() {
-    const GLOBAL_settings=await getSyncStorage(default_settings);
+async function remake_TOC(GLOBAL_settingsIn=null) {
+    const GLOBAL_settings=GLOBAL_settingsIn || await getSyncStorage(default_settings);
     // scrollbar area for TOC
     const scroll_ver = $("#scbar_vertical_forTOC");
     const div_toc = $(".ui-toc-dropdown", scroll_ver);
@@ -234,7 +240,7 @@ function addNaviButtons() {
 }
 
 function addModal(){
-    const rgba = ($("style:last-child", "head").html()||"background:rgba(30,30,30,.93);").match(/(?<=background:)[^;]+/)
+    const rgba = "rgba(30,30,30,.93)"//($("style:last-child", "head").html()||"background:rgba(30,30,30,.93);").match(/(?<=background:)[^;]+/)
     const adjustHTML = [`
     <div>
     <div class="h4">Opacity</div>
@@ -255,7 +261,7 @@ function addModal(){
     <button type="button" class="btn btn_menuTOCShowHide"><span aria-hidden="true" class="btn_menuTOCShowHide">show/HIDE</span></button>
     </div>
     `, `<div style="background: ${rgba || "rgba(30,30,30,.93)"}; height: 250px;">
-    <span class="h4" style="color: #EDA35E"># Sample</span>
+    <span class="h4" id="sampleTOCTitle" style="color: #EDA35E"># Sample</span>
     <div class="toc_sample">
         <div class="ui-toc-dropdown ui-affix-toc unselectable hidden-print" style="background-color: transparent; width: 200px; border: none; height: 170.4px; max-width: 200px; top:70px; visibility: visible;">
         <div class="toc expand toc-sample" style="background: white; opacity: 0.5; border: none; width: 190px; height: auto; z-index: 100;">
