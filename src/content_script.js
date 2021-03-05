@@ -1,17 +1,23 @@
 ﻿const default_settings = { opacity: 0.5, hide: false, width: 150, expand: true };
-let GLOBAL_settings;
-chrome.storage.sync.get(default_settings, items => {
-    GLOBAL_settings = items;
-})
-let GLOBAL_now_href = location.href;
+
+const getSyncStorage = (key = null) => new Promise(resolve => {
+    chrome.storage.sync.get(key, resolve);
+});
+
+const setSyncStorage = (key = null) => new Promise(resolve => {
+    chrome.storage.sync.set(key, resolve);
+});
 
 $(function () {
+    
+    let GLOBAL_now_href = location.href;
     initialSetting();
     // remake TOC per 1 minutes
-    setInterval(function () {
-        remake_TOC();
+    setInterval(async function () {
+        await remake_TOC();
     }, 60 * 1000);
-    const observer=new MutationObserver(records=>{
+    const observer=new MutationObserver(async records=>{
+        const GLOBAL_settings=await getSyncStorage(default_settings);
         $(".toc").each((ind, elem) => {
             const mode=obtainMode();
             if (!mode.edit) return;
@@ -24,8 +30,8 @@ $(function () {
         if (toc_view.length>0){
             observer.observe(toc_view[0], {childList:true, attributes:true});
             // if keypress -> remake TOC
-            document.addEventListener("keypress", function(e){
-                remake_TOC()
+            document.addEventListener("keypress", async function(e){
+                await remake_TOC()
             });
             clearInterval(observeTrigger)
         }
@@ -41,10 +47,11 @@ $(function () {
         const mode=obtainMode();
         // if change mode, remake TOC
         if (GLOBAL_now_href != location.href) {
-            remake_TOC();
+            await remake_TOC();
             addNaviButtons();
             GLOBAL_now_href = location.href;
         } //adjust TOC
+        const GLOBAL_settings=await getSyncStorage(default_settings);
         if (/menu_TOCAlways/.test(e_class)) {
             if (/menu_hideTOC/.test(e_class)) {
                 $(e.target).text(GLOBAL_settings.hidden ? "Hide TOC" : "Show TOC")
@@ -55,7 +62,7 @@ $(function () {
                 GLOBAL_settings.width = GLOBAL_settings.width <= 150 ? GLOBAL_settings.width + 50 : 100;
             }
             chrome.storage.sync.set(GLOBAL_settings);
-            remake_sampleTOC();
+            await remake_sampleTOC();
             $(".sidenav.main-sidenav").removeClass("in");
             $(".sidenav.sidenav-menu").removeClass("in");
         } // navi bar button
@@ -66,7 +73,7 @@ $(function () {
                 $(".toc").each((ind, elem) => {
                     $(elem).toggleClass("expand");
                 })
-                remake_TOC();
+                await remake_TOC();
                 chrome.storage.sync.set(GLOBAL_settings);
             } else if (/back_to_top/.test(e_class)) {
                 if (mode.edit && !mode.view) EditScroll(0);
@@ -103,22 +110,23 @@ $(function () {
             const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
             const opacityOrder = Math.min(4, Math.max(1, Math.floor(GLOBAL_settings.opacity / 0.25) + IsPls));
             GLOBAL_settings.opacity = opacityOrder * 0.25;
-            remake_sampleTOC();
+            await remake_sampleTOC();
         } else if (/btn_width/.test(e_class)) {
             const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
             const widthOrder = Math.min(4, Math.max(0, Math.floor((GLOBAL_settings.width-80)/30) + IsPls));
             GLOBAL_settings.width = widthOrder * 30 + 80;
-            remake_sampleTOC();
+            await remake_sampleTOC();
         } else if (/btn_menuTOCShowHide/.test(e_class)) {
             GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
             $(e.target).val(GLOBAL_settings.hidden ? "SHOW/hide" : "show/HIDE");
-            remake_sampleTOC();
+            await remake_sampleTOC();
         }
     })
     
 });
 
-const initialSetting = function () {
+const initialSetting = async function () {
+    const GLOBAL_settings=await getSyncStorage(default_settings);
     // make new scrollbar area for toc
     const cm = $(".CodeMirror.cm-s-one-dark.CodeMirror-wrap");
     const scroll_ver = $("<div>", {
@@ -139,12 +147,12 @@ const initialSetting = function () {
     addModal();
     addNaviButtons();
 
-    const inter = setInterval(function () {
+    const inter = setInterval(async function () {
         // check valid toc exists or not
 
         if ($(".ui-view-area #ui-toc-affix .toc").length>0 && $("#toc_out_ChEx").html() != "") {
-            remake_TOC();
-            remake_sampleTOC();
+            await remake_TOC();
+            await remake_sampleTOC();
             clearInterval(inter);
         }
     }, 500);
@@ -162,18 +170,20 @@ function ViewScroll(posTo = 0) {
     }, 100, 'linear')
 }
 
-function remake_sampleTOC() {
+async function remake_sampleTOC() {
+    const GLOBAL_settings=await getSyncStorage(default_settings);
     const sampleTOC = $(".toc-sample");
     ["opacity", "width"].forEach(key=>{
         const output=$(`.output_${key}Sample`);
         output.html(GLOBAL_settings[key]);
     })
     sampleTOC.css({ width: GLOBAL_settings.width - 10, opacity: GLOBAL_settings.opacity, visibility: (GLOBAL_settings.hidden) ? "hidden" : "visible" });
-    remake_TOC();
+    await remake_TOC();
     chrome.storage.sync.set(GLOBAL_settings)
 }
 
-function remake_TOC() {
+async function remake_TOC() {
+    const GLOBAL_settings=await getSyncStorage(default_settings);
     // scrollbar area for TOC
     const scroll_ver = $("#scbar_vertical_forTOC");
     const div_toc = $(".ui-toc-dropdown", scroll_ver);
