@@ -6,99 +6,119 @@ chrome.storage.sync.get(default_settings, items => {
 let GLOBAL_now_href = location.href;
 
 $(function () {
+    initialSetting();
     // remake TOC per 1 minutes
     setInterval(function () {
         remake_TOC();
     }, 60 * 1000);
-});
+    const observer=new MutationObserver(records=>{
+        $(".toc").each((ind, elem) => {
+            const mode=obtainMode();
+            if (!mode.edit) return;
+            if (GLOBAL_settings.expand) $(elem).addClass("expand");
+            else $(elem).removeClass("expand");
+        })
+    })
+    const observeTrigger=setInterval(()=>{
+        const toc_view = $(".ui-view-area #ui-toc-affix");
+        if (toc_view.length>0){
+            observer.observe(toc_view[0], {childList:true, attributes:true});
+            // if keypress -> remake TOC
+            document.addEventListener("keypress", function(e){
+                remake_TOC()
+            });
+            clearInterval(observeTrigger)
+        }
+    })
 
-// if keypress -> remake TOC
-addEventListener("keypress", remake_TOC);
-
-document.addEventListener("click", async function (e) {
-    const e_class = $(e.target).attr("class");
-    //console.log(e.target)
-    const mode = {
+    const obtainMode = ()=>({
         edit: $(".ui-edit-area").css("display") != "none",
         view: $(".ui-view-area").css("display") != "none"
-    };
-    // if change mode, remake TOC
-    if (GLOBAL_now_href != location.href) {
-        remake_TOC();
-        addNaviButtons();
-        GLOBAL_now_href = location.href;
-    } //adjust TOC
-    if (/menu_TOCAlways/.test(e_class)) {
-        if (/menu_hideTOC/.test(e_class)) {
-            $(e.target).text(GLOBAL_settings.hidden ? "Hide TOC" : "Show TOC")
-            GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
-        } else if (/menu_adjustTOC_opacity/.test(e_class)) {
-            GLOBAL_settings.opacity = GLOBAL_settings.opacity <= 0.5 ? GLOBAL_settings.opacity * 2 : 0.25;
-        } else if (/menu_adjustTOC_width/.test(e_class)) {
-            GLOBAL_settings.width = GLOBAL_settings.width <= 150 ? GLOBAL_settings.width + 50 : 100;
-        }
-        chrome.storage.sync.set(GLOBAL_settings);
-        remake_sampleTOC();
-        $(".sidenav.main-sidenav").removeClass("in");
-        $(".sidenav.sidenav-menu").removeClass("in");
-    } // navi bar button
-    if (/naviTOC_button/.test(e_class)) {
-        if (/expand_toggle/.test(e_class)) {
-            GLOBAL_settings.expand = !GLOBAL_settings.expand;
-            $(".toc").each((ind, elem) => {
-                $(elem).toggleClass("expand");
-            })
+    });
+    document.addEventListener("click", async function (e) {
+        const e_class = $(e.target).attr("class");
+        //console.log(e.target)
+        const mode=obtainMode();
+        // if change mode, remake TOC
+        if (GLOBAL_now_href != location.href) {
             remake_TOC();
+            addNaviButtons();
+            GLOBAL_now_href = location.href;
+        } //adjust TOC
+        if (/menu_TOCAlways/.test(e_class)) {
+            if (/menu_hideTOC/.test(e_class)) {
+                $(e.target).text(GLOBAL_settings.hidden ? "Hide TOC" : "Show TOC")
+                GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
+            } else if (/menu_adjustTOC_opacity/.test(e_class)) {
+                GLOBAL_settings.opacity = GLOBAL_settings.opacity <= 0.5 ? GLOBAL_settings.opacity * 2 : 0.25;
+            } else if (/menu_adjustTOC_width/.test(e_class)) {
+                GLOBAL_settings.width = GLOBAL_settings.width <= 150 ? GLOBAL_settings.width + 50 : 100;
+            }
             chrome.storage.sync.set(GLOBAL_settings);
-        } else if (/back_to_top/.test(e_class)) {
-            if (mode.edit && !mode.view) EditScroll(0);
-            else if (mode.edit && mode.view) ViewScroll(0);
-            else $("html, body").stop(true, true).animate({
-                scrollTop: 0
-            }, 100, 'linear');
-        } else if (/go_to_bottom/.test(e_class)) {
-            const posBottom = $(".CodeMirror-sizer").css("min-height").replace("px", "")
-                - $(".CodeMirror-lines").css("padding-bottom").replace("px", "")
-                - $(".CodeMirror-scroll").height();
-            if (mode.edit && !mode.view) EditScroll(posBottom);
-            else if (mode.edit && mode.view) ViewScroll($(".ui-view-area .markdown-body").height());
-            else $("html, body").stop(true, true).animate({
-                scrollTop: $(".ui-view-area .markdown-body").height()
-            }, 100, 'linear');
-        } else if (/open_toc_menu/.test(e_class)) {
-            const modal = $(".tocAdjust-modal");
-            modal.css({ display: "block" }).addClass("in");
+            remake_sampleTOC();
+            $(".sidenav.main-sidenav").removeClass("in");
+            $(".sidenav.sidenav-menu").removeClass("in");
+        } // navi bar button
+        if (/naviTOC_button/.test(e_class)) {
+            if (/expand_toggle|expand-toggle/.test(e_class)) {
+                console.log(GLOBAL_settings.expand)
+                GLOBAL_settings.expand = !GLOBAL_settings.expand;
+                $(".toc").each((ind, elem) => {
+                    $(elem).toggleClass("expand");
+                })
+                remake_TOC();
+                chrome.storage.sync.set(GLOBAL_settings);
+            } else if (/back_to_top/.test(e_class)) {
+                if (mode.edit && !mode.view) EditScroll(0);
+                else if (mode.edit && mode.view) ViewScroll(0);
+                else $("html, body").stop(true, true).animate({
+                    scrollTop: 0
+                }, 100, 'linear');
+            } else if (/go_to_bottom/.test(e_class)) {
+                const posBottom = $(".CodeMirror-sizer").css("min-height").replace("px", "")
+                    - $(".CodeMirror-lines").css("padding-bottom").replace("px", "")
+                    - $(".CodeMirror-scroll").height();
+                if (mode.edit && !mode.view) EditScroll(posBottom);
+                else if (mode.edit && mode.view) ViewScroll($(".ui-view-area .markdown-body").height());
+                else $("html, body").stop(true, true).animate({
+                    scrollTop: $(".ui-view-area .markdown-body").height()
+                }, 100, 'linear');
+            } else if (/open_toc_menu/.test(e_class)) {
+                const modal = $(".tocAdjust-modal");
+                modal.css({ display: "block" }).addClass("in");
+            }
+        } // toc jump in edit mode
+        if ($(e.target).parents("#toc_out_ChEx").length > 0 && mode.edit && !mode.view) {
+            const href_id = $(e.target).attr("href").match(/(?<=^#).*/);
+            const line_num = $(`#${href_id}`).attr("data-startline") - 0;
+            const line_hegiht = $(".CodeMirror>div>textarea").css("height").replace("px", "");
+            EditScroll(line_num * line_hegiht * 1.2 - 15);
         }
-    } // toc jump in edit mode
-    if ($(e.target).parents("#toc_out_ChEx").length > 0 && mode.edit && !mode.view) {
-        const href_id = $(e.target).attr("href").match(/(?<=^#).*/);
-        const line_num = $(`#${href_id}`).attr("data-startline") - 0;
-        const line_hegiht = $(".CodeMirror>div>textarea").css("height").replace("px", "");
-        EditScroll(line_num * line_hegiht * 1.2 - 15);
-    }
-    if ("close" == $(e.target).parent("button").attr("class")) {
-        const modal = $(e.target).parents(".modal.fade.in");
-        if (modal.length == 0) return;
-        modal.attr({ style: "" }).removeClass("in");
-    } else if (/btn_opacity/.test(e_class)) {
-        console.log(e.target)
-        const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
-        const opacityOrder = Math.min(4, Math.max(1, Math.floor(GLOBAL_settings.opacity / 0.25) + IsPls));
-        GLOBAL_settings.opacity = opacityOrder * 0.25;
-        remake_sampleTOC();
-    } else if (/btn_width/.test(e_class)) {
-        const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
-        const widthOrder = Math.min(4, Math.max(0, Math.floor((GLOBAL_settings.width-80)/30) + IsPls));
-        GLOBAL_settings.width = widthOrder * 30 + 80;
-        remake_sampleTOC();
-    } else if (/btn_menuTOCShowHide/.test(e_class)) {
-        GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
-        $(e.target).val(GLOBAL_settings.hidden ? "SHOW/hide" : "show/HIDE");
-        remake_sampleTOC();
-    }
-})
+        if ("close" == $(e.target).parent("button").attr("class")) {
+            const modal = $(e.target).parents(".modal.fade.in");
+            if (modal.length == 0) return;
+            modal.attr({ style: "" }).removeClass("in");
+        } else if (/btn_opacity/.test(e_class)) {
+            console.log(e.target)
+            const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
+            const opacityOrder = Math.min(4, Math.max(1, Math.floor(GLOBAL_settings.opacity / 0.25) + IsPls));
+            GLOBAL_settings.opacity = opacityOrder * 0.25;
+            remake_sampleTOC();
+        } else if (/btn_width/.test(e_class)) {
+            const IsPls = (/Pls/.test(e_class)) ? +1 : -1;
+            const widthOrder = Math.min(4, Math.max(0, Math.floor((GLOBAL_settings.width-80)/30) + IsPls));
+            GLOBAL_settings.width = widthOrder * 30 + 80;
+            remake_sampleTOC();
+        } else if (/btn_menuTOCShowHide/.test(e_class)) {
+            GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
+            $(e.target).val(GLOBAL_settings.hidden ? "SHOW/hide" : "show/HIDE");
+            remake_sampleTOC();
+        }
+    })
+    
+});
 
-window.onload = function () {
+const initialSetting = function () {
     // make new scrollbar area for toc
     const cm = $(".CodeMirror.cm-s-one-dark.CodeMirror-wrap");
     const scroll_ver = $("<div>", {
@@ -117,13 +137,14 @@ window.onload = function () {
     // make TOC and TOC menu
     // addMenuButton();
     addModal();
+    addNaviButtons();
 
     const inter = setInterval(function () {
-        remake_TOC();
-        remake_sampleTOC();
-        addNaviButtons();
         // check valid toc exists or not
-        if ($("#toc_out_ChEx").html() != "") {
+
+        if ($(".ui-view-area #ui-toc-affix .toc").length>0 && $("#toc_out_ChEx").html() != "") {
+            remake_TOC();
+            remake_sampleTOC();
             clearInterval(inter);
         }
     }, 500);
@@ -145,7 +166,6 @@ function remake_sampleTOC() {
     const sampleTOC = $(".toc-sample");
     ["opacity", "width"].forEach(key=>{
         const output=$(`.output_${key}Sample`);
-        console.log(output)
         output.html(GLOBAL_settings[key]);
     })
     sampleTOC.css({ width: GLOBAL_settings.width - 10, opacity: GLOBAL_settings.opacity, visibility: (GLOBAL_settings.hidden) ? "hidden" : "visible" });
@@ -175,7 +195,7 @@ function remake_TOC() {
     const toc_view = $(".ui-view-area #ui-toc-affix .toc");
     const toc_out = $("<div>");
     toc_out.html(toc_view.html()); // copy toc
-    div_toc.append(toc_out.attr({ class: GLOBAL_settings.expand ? "toc expand" : "toc", id: "toc_out_ChEx" })
+    div_toc.append(toc_out.attr({ class: "toc" + (GLOBAL_settings.expand ? " expand" : ""), id: "toc_out_ChEx" })
         .css({ ...css_dic }));
     div_toc.css({ height: toc_out.height() })
 }
@@ -204,7 +224,7 @@ function addNaviButtons() {
 }
 
 function addModal(){
-    const rgba = $("style:last-child", "head").html().match(/(?<=background:)[^;]+/)
+    const rgba = ($("style:last-child", "head").html()||"background:rgba(30,30,30,.93);").match(/(?<=background:)[^;]+/)
     const adjustHTML = [`
     <div>
     <div class="h4">Opacity</div>
@@ -304,8 +324,6 @@ function addMenuButton() {
         side_comp.append(side_span);
         menu_side_ul.append(side_comp);
     }
-
-    
 
 }
 
