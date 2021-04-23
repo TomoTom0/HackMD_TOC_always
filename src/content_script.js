@@ -1,4 +1,6 @@
-﻿const default_settings = { opacity: 0.5, hidden: false, width: 150, expand: true };
+﻿"use strict";
+
+const default_settings = { opacity: 0.5, hidden: false, width: 150, expand: true };
 
 const getSyncStorage = (key = null) => new Promise(resolve => {
     chrome.storage.sync.get(key, resolve);
@@ -8,8 +10,8 @@ const setSyncStorage = (key = null) => new Promise(resolve => {
     chrome.storage.sync.set(key, resolve);
 });
 
+// # on load
 $(function () {
-    
     let GLOBAL_now_href = location.href;
     initialSetting();
     // remake TOC per 1 minutes
@@ -52,7 +54,6 @@ $(function () {
             GLOBAL_now_href = location.href;
         } //adjust TOC
         let GLOBAL_settings=await getSyncStorage(default_settings);
-        console.log(GLOBAL_settings)
         if (/menu_TOCAlways/.test(e_class)) {
             if (/menu_hideTOC/.test(e_class)) {
                 GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
@@ -176,7 +177,7 @@ function ViewScroll(posTo = 0) {
 
 async function remake_sampleTOC(GLOBAL_settingsIn=null) {
     const GLOBAL_settings=GLOBAL_settingsIn || await getSyncStorage(default_settings);
-    const sampleTOC = $(".toc-sample");
+    const sampleTOC = $("div.toc-sample");
     ["opacity", "width"].forEach(key=>{
         const output=$(`.output_${key}Sample`);
         output.html(GLOBAL_settings[key]);
