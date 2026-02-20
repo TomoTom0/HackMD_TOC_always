@@ -11,17 +11,15 @@ NC='\033[0m' # No Color
 
 # Load .env file if exists
 if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
 fi
 
 # Default values
 DIST_DIR=${DIST_DIR:-dist}
 DEPLOY_TARGET=${DEPLOY_TARGET:-}
-
-# Expand variables in DEPLOY_TARGET
-if [ -n "$DEPLOY_TARGET" ]; then
-    DEPLOY_TARGET=$(eval echo "$DEPLOY_TARGET")
-fi
 
 # Check if deploy target is set
 if [ -z "$DEPLOY_TARGET" ]; then

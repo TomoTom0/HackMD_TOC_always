@@ -88,8 +88,9 @@ function createElement(tag, options = {}) {
         }
         // adjust TOC
         let GLOBAL_settings = await getSyncStorage();
-        if (typeof e_class === 'string' && e_class.includes('menu_TOCAlways')) {
-            if (e_class.includes('menu_hideTOC')) {
+        const classList = e.target.classList;
+        if (classList && classList.contains('menu_TOCAlways')) {
+            if (classList.contains('menu_hideTOC')) {
                 GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
                 // Update menu text
                 const menuLink = e.target.closest('a');
@@ -98,15 +99,15 @@ function createElement(tag, options = {}) {
                     const label = GLOBAL_settings.hidden ? 'Show TOC' : 'Hide TOC';
                     menuLink.innerHTML = `<i class="ph ${icon}"></i> ${label}`;
                 }
-            } else if (e_class.includes('menu_openTOCSettings')) {
+            } else if (classList.contains('menu_openTOCSettings')) {
                 const modal = $(".tocAdjust-modal");
                 if (modal) {
                     modal.style.display = "block";
                     modal.classList.add("in");
                 }
-            } else if (e_class.includes('menu_adjustTOC_opacity')) {
+            } else if (classList.contains('menu_adjustTOC_opacity')) {
                 GLOBAL_settings.opacity = GLOBAL_settings.opacity <= 0.5 ? GLOBAL_settings.opacity * 2 : 0.25;
-            } else if (e_class.includes('menu_adjustTOC_width')) {
+            } else if (classList.contains('menu_adjustTOC_width')) {
                 GLOBAL_settings.width = GLOBAL_settings.width <= 150 ? GLOBAL_settings.width + 50 : 100;
             }
             await remake_sampleTOC(GLOBAL_settings);
@@ -114,41 +115,6 @@ function createElement(tag, options = {}) {
             const sidenavMenu = $(".sidenav.sidenav-menu");
             if (sidenav) sidenav.classList.remove("in");
             if (sidenavMenu) sidenavMenu.classList.remove("in");
-        }
-        // navi bar button
-        if (typeof e_class === 'string' && e_class.includes('naviTOC_button')) {
-            if (e_class.includes('expand_toggle') || e_class.includes('expand-toggle')) {
-                GLOBAL_settings.expand = !GLOBAL_settings.expand;
-                $$(".toc").forEach((elem) => {
-                    elem.classList.toggle("expand");
-                });
-                await remake_TOC();
-                chrome.storage.sync.set(GLOBAL_settings);
-            } else if (e_class.includes('back_to_top')) {
-                if (mode.edit && !mode.view) EditScroll(0);
-                else if (mode.edit && mode.view) ViewScroll(0);
-                else animateScroll(0);
-            } else if (e_class.includes('go_to_bottom')) {
-                const codeMirrorSizer = $(".CodeMirror-sizer");
-                const codeMirrorLines = $(".CodeMirror-lines");
-                const codeMirrorScroll = $(".CodeMirror-scroll");
-                if (codeMirrorSizer && codeMirrorLines && codeMirrorScroll) {
-                    const posBottom = parseInt(codeMirrorSizer.style.minHeight || '0')
-                        - parseInt(codeMirrorLines.style.paddingBottom || '0')
-                        - codeMirrorScroll.offsetHeight;
-                    if (mode.edit && !mode.view) EditScroll(posBottom);
-                    else {
-                        const markdownBody = $(".markdown-body");
-                        if (markdownBody) animateScroll(markdownBody.offsetHeight);
-                    }
-                }
-            } else if (e_class.includes('open_toc_menu')) {
-                const modal = $(".tocAdjust-modal");
-                if (modal) {
-                    modal.style.display = "block";
-                    modal.classList.add("in");
-                }
-            }
         }
         // toc jump in edit mode
         const tocOut = $("#toc_out_ChEx");
@@ -172,27 +138,28 @@ function createElement(tag, options = {}) {
                     }
                 }
                 if (line_num > 0) {
-                    const codeMirrorTextarea = $(".CodeMirror>div>textarea");
-                    if (codeMirrorTextarea) {
-                        const line_height = parseInt(codeMirrorTextarea.style.height || '0');
-                        EditScroll(line_num * line_height * 1.2 - 15);
+                    const firstLine = $(".CodeMirror-line");
+                    if (firstLine) {
+                        const lineHeight = firstLine.offsetHeight;
+                        // data-startline is 1-based, so subtract 1 for 0-based calculation.
+                        EditScroll((line_num - 1) * lineHeight);
                     }
                 }
             }
         }
-        if (e.target.parentElement && e.target.parentElement.tagName === 'BUTTON' && e.target.parentElement.classList.contains('close')) {
+        if (e.target.closest('button.close')) {
             const modal = e.target.closest('.modal.fade.in');
             if (modal) {
                 modal.removeAttribute('style');
                 modal.classList.remove('in');
             }
-        } else if (typeof e_class === 'string' && e_class.includes('btn_opacity')) {
-            const IsPls = e_class.includes('Pls') ? 1 : -1;
+        } else if (classList && classList.contains('btn_opacity')) {
+            const IsPls = classList.contains('btn_opacityPls') ? 1 : -1;
             const opacityOrder = Math.min(4, Math.max(1, Math.floor(GLOBAL_settings.opacity / 0.25) + IsPls));
             GLOBAL_settings.opacity = opacityOrder * 0.25;
             await remake_sampleTOC(GLOBAL_settings);
-        } else if (typeof e_class === 'string' && e_class.includes('btn_width')) {
-            const IsPls = e_class.includes('Pls') ? 1 : -1;
+        } else if (classList && classList.contains('btn_width')) {
+            const IsPls = classList.contains('btn_widthPls') ? 1 : -1;
             const widthOrder = Math.min(4, Math.max(0, Math.floor((GLOBAL_settings.width - 80) / 30) + IsPls));
             GLOBAL_settings.width = widthOrder * 30 + 80;
             await remake_sampleTOC(GLOBAL_settings);
@@ -236,9 +203,15 @@ async function initialSetting() {
     addModal();
     addNaviButtons();
 
-    // Generate TOC after initial render
-    await remake_TOC();
-    await remake_sampleTOC();
+    // Generate TOC after initial render, waiting for headings to appear
+    const initialTocTrigger = setInterval(async () => {
+        const headings = $$("h1, h2, h3, h4, h5, h6", $(".markdown-body"));
+        if (headings.length > 0) {
+            clearInterval(initialTocTrigger);
+            await remake_TOC();
+            await remake_sampleTOC();
+        }
+    }, 500);
 }
 
 function EditScroll(posTo = 0) {
