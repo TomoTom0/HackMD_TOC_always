@@ -16,9 +16,13 @@ const $$ = (selector, parent = document) => Array.from(parent.querySelectorAll(s
 
 function setStyles(element, styles) {
     if (!element) return;
-    Object.entries(styles).forEach(([key, value]) => {
-        element.style[key] = value;
-    });
+    if (typeof styles === 'string') {
+        element.style.cssText = styles;
+    } else {
+        Object.entries(styles).forEach(([key, value]) => {
+            element.style[key] = value;
+        });
+    }
 }
 
 function createElement(tag, options = {}) {
@@ -35,8 +39,8 @@ function createElement(tag, options = {}) {
     return elem;
 }
 
-// # on load
-document.addEventListener('DOMContentLoaded', async () => {
+// # on load (content scripts run after DOM is ready)
+(async () => {
     let GLOBAL_now_href = location.href;
     await initialSetting();
     // remake TOC per 1 minutes
@@ -46,29 +50,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const observer = new MutationObserver(async records => {
         const GLOBAL_settings = await getSyncStorage();
-        $$(".toc").forEach((elem) => {
+        const toc_out = $("#toc_out_ChEx");
+        if (toc_out) {
             const mode = obtainMode();
             if (!mode.edit) return;
-            if (GLOBAL_settings.expand) elem.classList.add("expand");
-            else elem.classList.remove("expand");
-        });
+            if (GLOBAL_settings.expand) toc_out.classList.add("expand");
+            else toc_out.classList.remove("expand");
+        }
+    });
+
+    // if keypress -> remake TOC
+    document.addEventListener("keypress", async function (e) {
+        await remake_TOC();
     });
 
     const observeTrigger = setInterval(() => {
-        const toc_view = $(".ui-view-area #ui-toc-affix");
-        if (toc_view) {
-            observer.observe(toc_view, { childList: true, attributes: true });
-            // if keypress -> remake TOC
-            document.addEventListener("keypress", async function (e) {
-                await remake_TOC();
-            });
+        const toc_out = $("#toc_out_ChEx");
+        if (toc_out) {
+            observer.observe(toc_out, { childList: true, attributes: true });
             clearInterval(observeTrigger);
         }
     });
 
     const obtainMode = () => ({
-        edit: $(".ui-edit-area") && $(".ui-edit-area").style.display !== "none",
-        view: $(".ui-view-area") && $(".ui-view-area").style.display !== "none"
+        edit: location.href.includes('?edit') || !!$(".CodeMirror"),
+        view: !location.href.includes('?edit') && !$(".CodeMirror")
     });
 
     document.addEventListener("click", async function (e) {
@@ -85,7 +91,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (typeof e_class === 'string' && e_class.includes('menu_TOCAlways')) {
             if (e_class.includes('menu_hideTOC')) {
                 GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
-                e.target.textContent = GLOBAL_settings.hidden ? "Show TOC" : "Hide TOC";
+                // Update menu text
+                const menuLink = e.target.closest('a');
+                if (menuLink) {
+                    const icon = GLOBAL_settings.hidden ? 'ph-eye' : 'ph-eye-slash';
+                    const label = GLOBAL_settings.hidden ? 'Show TOC' : 'Hide TOC';
+                    menuLink.innerHTML = `<i class="ph ${icon}"></i> ${label}`;
+                }
+            } else if (e_class.includes('menu_openTOCSettings')) {
+                const modal = $(".tocAdjust-modal");
+                if (modal) {
+                    modal.style.display = "block";
+                    modal.classList.add("in");
+                }
             } else if (e_class.includes('menu_adjustTOC_opacity')) {
                 GLOBAL_settings.opacity = GLOBAL_settings.opacity <= 0.5 ? GLOBAL_settings.opacity * 2 : 0.25;
             } else if (e_class.includes('menu_adjustTOC_width')) {
@@ -100,7 +118,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         // navi bar button
         if (typeof e_class === 'string' && e_class.includes('naviTOC_button')) {
             if (e_class.includes('expand_toggle') || e_class.includes('expand-toggle')) {
-                console.log(GLOBAL_settings.expand);
                 GLOBAL_settings.expand = !GLOBAL_settings.expand;
                 $$(".toc").forEach((elem) => {
                     elem.classList.toggle("expand");
@@ -120,11 +137,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         - parseInt(codeMirrorLines.style.paddingBottom || '0')
                         - codeMirrorScroll.offsetHeight;
                     if (mode.edit && !mode.view) EditScroll(posBottom);
-                    else if (mode.edit && mode.view) {
-                        const markdownBody = $(".ui-view-area .markdown-body");
-                        if (markdownBody) ViewScroll(markdownBody.offsetHeight);
-                    } else {
-                        const markdownBody = $(".ui-view-area .markdown-body");
+                    else {
+                        const markdownBody = $(".markdown-body");
                         if (markdownBody) animateScroll(markdownBody.offsetHeight);
                     }
                 }
@@ -139,12 +153,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         // toc jump in edit mode
         const tocOut = $("#toc_out_ChEx");
         if (tocOut && e.target.closest("#toc_out_ChEx") && mode.edit && !mode.view) {
-            const href = e.target.getAttribute('href');
-            if (href && href.startsWith('#')) {
-                const href_id = href.substring(1);
-                const targetElem = document.getElementById(href_id);
-                if (targetElem) {
-                    const line_num = parseInt(targetElem.getAttribute('data-startline') || '0');
+            const anchor = e.target.closest("a");
+            if (anchor) {
+                let line_num = 0;
+                // First, try to get data-startline from the anchor itself (set by generateTOCFromHeadings)
+                const anchorLine = anchor.getAttribute("data-startline");
+                if (anchorLine) {
+                    line_num = parseInt(anchorLine || '0');
+                } else {
+                    // Fallback: get from href target
+                    const href = anchor.getAttribute('href');
+                    if (href && href.startsWith('#')) {
+                        const href_id = href.substring(1);
+                        const targetElem = document.getElementById(href_id);
+                        if (targetElem) {
+                            line_num = parseInt(targetElem.getAttribute('data-startline') || '0');
+                        }
+                    }
+                }
+                if (line_num > 0) {
                     const codeMirrorTextarea = $(".CodeMirror>div>textarea");
                     if (codeMirrorTextarea) {
                         const line_height = parseInt(codeMirrorTextarea.style.height || '0');
@@ -176,10 +203,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             await remake_sampleTOC(GLOBAL_settings);
         }
     });
-});
+})();
 
 async function initialSetting() {
     const GLOBAL_settings = await getSyncStorage();
+
+    // Hide existing TOC
+    const existingTocAffix = $("#ui-toc-affix");
+    if (existingTocAffix) {
+        existingTocAffix.style.display = "none";
+    }
+
     const cm = $(".CodeMirror-wrap");
     if (!cm) return;
 
@@ -195,32 +229,16 @@ async function initialSetting() {
     // insert toc-dropdown
     const div_toc = createElement('div', {
         class: 'ui-toc-dropdown ui-affix-toc unselectable hidden-print',
-        style: {
-            maxHeight: '',
-            backgroundColor: 'transparent',
-            overflow: 'hidden',
-            margin: '5px',
-            right: '10px',
-            top: '0px',
-            width: `${GLOBAL_settings.width}px`,
-            border: 'none',
-            height: '30%'
-        }
+        style: `background-color: transparent; overflow: hidden; margin: 5px; right: 10px; top: 0px; width: ${GLOBAL_settings.width}px; border: none; height: 30%;`
     });
     scroll_ver.appendChild(div_toc);
 
     addModal();
     addNaviButtons();
 
-    const inter = setInterval(async function () {
-        const toc_view = $(".ui-view-area #ui-toc-affix .toc");
-        const toc_out = $("#toc_out_ChEx");
-        if (toc_view && toc_out && toc_out.innerHTML !== "") {
-            await remake_TOC();
-            await remake_sampleTOC();
-            clearInterval(inter);
-        }
-    }, 500);
+    // Generate TOC after initial render
+    await remake_TOC();
+    await remake_sampleTOC();
 }
 
 function EditScroll(posTo = 0) {
@@ -231,10 +249,8 @@ function EditScroll(posTo = 0) {
 }
 
 function ViewScroll(posTo = 0) {
-    const viewArea = $(".ui-view-area");
-    if (viewArea) {
-        animateScrollElem(viewArea, posTo);
-    }
+    // View mode: scroll the page
+    animateScroll(posTo);
 }
 
 function animateScroll(posTo) {
@@ -303,6 +319,63 @@ async function remake_sampleTOC(GLOBAL_settingsIn = null) {
     await setSyncStorage(GLOBAL_settings);
 }
 
+/**
+ * Generate TOC from headings in markdown-body
+ * @returns {HTMLElement|null} - TOC element or null if no headings found
+ */
+function generateTOCFromHeadings() {
+    const markdownBody = $(".markdown-body");
+    if (!markdownBody) return null;
+
+    const headings = $$("h1, h2, h3, h4, h5, h6", markdownBody);
+    if (headings.length === 0) return null;
+
+    const ul = createElement("ul", { class: "nav" });
+    const stack = [{ ul, level: 0 }];
+
+    headings.forEach(heading => {
+        const level = parseInt(heading.tagName.substring(1));
+        const text = heading.textContent.trim();
+        const anchorId = heading.id;
+        const startLine = heading.getAttribute("data-startline");
+
+        if (!text) return;
+
+        const li = createElement("li", {
+            children: [
+                createElement("a", {
+                    attr: {
+                        href: anchorId ? `#${anchorId}` : "#",
+                        title: text,
+                        smoothhashscroll: ""
+                    },
+                    text: text
+                })
+            ]
+        });
+
+        if (startLine) {
+            const anchor = li.querySelector("a");
+            if (anchor) anchor.setAttribute("data-startline", startLine);
+        }
+
+        while (stack.length > 1 && stack[stack.length - 1].level >= level) {
+            stack.pop();
+        }
+
+        const currentContainer = stack[stack.length - 1].ul;
+        currentContainer.appendChild(li);
+
+        if (level < 6) {
+            const childUl = createElement("ul", { class: "nav" });
+            li.appendChild(childUl);
+            stack.push({ ul: childUl, level });
+        }
+    });
+
+    return ul;
+}
+
 async function remake_TOC(GLOBAL_settingsIn = null) {
     const GLOBAL_settings = GLOBAL_settingsIn || await getSyncStorage();
     const scroll_ver = $("#scbar_vertical_forTOC");
@@ -323,8 +396,8 @@ async function remake_TOC(GLOBAL_settingsIn = null) {
 
     if (GLOBAL_settings.hidden) return;
 
-    const toc_view = $(".ui-view-area #ui-toc-affix .toc");
-    if (!toc_view) return;
+    const tocNav = generateTOCFromHeadings();
+    if (!tocNav) return;
 
     const css_dic = {
         maxHeight: '',
@@ -339,46 +412,62 @@ async function remake_TOC(GLOBAL_settingsIn = null) {
     const new_toc_out = createElement('div', {
         class: 'toc' + (GLOBAL_settings.expand ? ' expand' : ''),
         id: 'toc_out_ChEx',
-        html: toc_view.innerHTML,
         style: css_dic
     });
+    new_toc_out.appendChild(tocNav);
 
     div_toc.appendChild(new_toc_out);
     div_toc.style.height = new_toc_out.offsetHeight + 'px';
 }
 
-function addNaviButtons() {
-    const navibar_class = "div.collapse.navbar-collapse";
-    const navi_bar_elements = $$(`${navibar_class} nav .navbar-left`);
-    const navi_bar = navi_bar_elements.length > 1 ? navi_bar_elements[1] : $("div.navbar-header .nav-mobile");
-    if (!navi_bar) return;
+async function addNaviButtons() {
+    // Add TOC menu items to the dropdown menu
+    const dropdownMenu = $("ul.ui-extra-menu.dropdown-menu");
+    if (!dropdownMenu) return;
 
-    const menu_contents = [
-        { id: "expand_toggle", img: "img/unfold_less_black_48dp.png" },
-        { id: "back_to_top", img: "img/north_black_48dp.png" },
-        { id: "go_to_bottom", img: "img/south_black_48dp.png" },
-        { id: "open_toc_menu", img: "img/baseline_build_black_48dp.png" }
+    // Avoid double contents
+    $$(".menu_TOCAlways", dropdownMenu).forEach((elem) => elem.remove());
+
+    // Get current settings
+    const settings = await getSyncStorage();
+
+    // Add divider
+    const divider = createElement('li', {
+        attr: { 'aria-hidden': 'true' },
+        class: 'divider menu_TOCAlways'
+    });
+
+    // Add TOC header
+    const header = createElement('li', {
+        class: 'dropdown-header menu_TOCAlways',
+        text: 'TOC Settings'
+    });
+
+    // Add menu items based on current settings
+    const hideIcon = settings.hidden ? 'ph-eye' : 'ph-eye-slash';
+    const hideLabel = settings.hidden ? 'Show TOC' : 'Hide TOC';
+    const menuItems = [
+        { label: hideLabel, class: 'menu_TOCAlways menu_hideTOC', icon: hideIcon },
+        { label: 'TOC Settings', class: 'menu_TOCAlways menu_openTOCSettings', icon: 'ph-wrench' }
     ];
 
-    // avoid double contents
-    $$(".li_naviTOC", navi_bar).forEach((elem) => elem.remove());
-
-    menu_contents.forEach(cont => {
-        const img_path = chrome.runtime.getURL(cont.img);
-        const img_tmp = createElement('img', {
-            attr: { src: img_path },
-            style: { height: '15px' },
-            class: `naviTOC_button ${cont.id}`
+    const items = menuItems.map(item => {
+        const a = createElement('a', {
+            attr: { role: 'menuitem', href: '#', tabindex: '-1' },
+            class: item.class,
+            html: `<i class="ph ${item.icon}"></i> ${item.label}`
         });
-        const a_tmp = createElement('a', {
-            attr: { href: '#' },
-            class: `naviTOC_button ${cont.id}`
+        return createElement('li', {
+            attr: { role: 'presentation' },
+            class: 'menu_TOCAlways',
+            children: [a]
         });
-        a_tmp.appendChild(img_tmp);
-        const li_tmp = createElement('li', { class: 'li_naviTOC' });
-        li_tmp.appendChild(a_tmp);
-        navi_bar.appendChild(li_tmp);
     });
+
+    // Insert after existing items
+    dropdownMenu.appendChild(divider);
+    dropdownMenu.appendChild(header);
+    items.forEach(item => dropdownMenu.appendChild(item));
 }
 
 function addModal() {
