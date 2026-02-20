@@ -1,4 +1,19 @@
+# IDE
 .idea
+
+# Build
+dist/
+
+# Environment
+.env
+
+# Development
+.playwright-mcp/
+
+# Temporary
 src.zip
 *Zone.Identifer
-.*
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,37 +1,79 @@
-<meta charset="UTF-8">
-<h1>Option</h1>
-<form>
-    <!--
-    <div style="display: flex; height: 150px;">
-        <div class="ope-storage-array"  data-col-rate="4" data-storage="example01.templates" data-title="example01.templates"></div>
-        <div class="ope-storage-object" data-col-rate="1" data-storage="example02.sums" data-title="example02.sums"></div>
-    </div>
-    <div style="display: flex; height: 100px;">
-        <div class="ope-storage-object" data-col-rate="2" data-storage="example07.comments" data-title="example07.comments"></div>
-        <div class="ope-storage-object" data-col-rate="2" data-storage="example08.notify" data-title="example08.notify"></div>
-    </div>
-    -->
-</form>
-<!--
-<hr>
-<div style="padding: 20px 0;">
-    <a href="#" target="_blank">マニュアル</a>
-    <span style="margin-left: 40px;">問い合わせ先: </span><span id="chex-inquiry"></span>
-    <a id="chex-notify-reset" style="margin-left: 40px;" href="javascript:void(0)">通知リセット</a>
-</div>
--->
-<script src="jquery-2.2.0.min.js"></script>
-<script src="options_script.js"></script>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>HackMD TOC always - Options</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .option-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .option-group h5 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 5px 15px;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .value-display {
+            display: inline-block;
+            min-width: 50px;
+            text-align: center;
+            font-weight: bold;
+        }
+        #status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 3px;
+            display: none;
+        }
+        #status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <h1>HackMD TOC always - Options</h1>
 
-<h5>Opacity</h5>
-<button type="button" class="btn btn_danger btn_opacityPls"><span aria-hidden="true">+</span></button>
-<button type="button" class="btn btn_primary btn_opacityPls"><span aria-hidden="true">-</span></button>
-<br>
-<h5>Width</h5>
-<button type="button" class="btn_opacityPls"><span aria-hidden="true">+</span></button>
-<button type="button" class="btn_opacityPls"><span aria-hidden="true">-</span></button>
-<br>
-<h5>Hide / Show</h5>
-<button type="button" class="btn_opacityPls"><span aria-hidden="true">+</span></button>
-<button type="button" class="btn_opacityPls"><span aria-hidden="true">-</span></button>
-<br>
+    <div class="option-group">
+        <h5>Opacity</h5>
+        <button type="button" id="btnOpacityPlus">+</button>
+        <button type="button" id="btnOpacityMinus">-</button>
+        <span id="opacityValue" class="value-display">0.5</span>
+    </div>
+
+    <div class="option-group">
+        <h5>Width</h5>
+        <button type="button" id="btnWidthPlus">+</button>
+        <button type="button" id="btnWidthMinus">-</button>
+        <span id="widthValue" class="value-display">150</span>
+    </div>
+
+    <div class="option-group">
+        <h5>TOC Visibility</h5>
+        <button type="button" id="btnToggleHidden">Toggle</button>
+        <span id="hiddenValue" class="value-display">Visible</span>
+    </div>
+
+    <div class="option-group">
+        <h5>Expand TOC</h5>
+        <button type="button" id="btnToggleExpand">Toggle</button>
+        <span id="expandValue" class="value-display">Expanded</span>
+    </div>
+
+    <div id="status"></div>
+
+    <script src="options_script.js"></script>
+</body>
+</html>
