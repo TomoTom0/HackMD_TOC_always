@@ -12,7 +12,7 @@
 
 ## 開発ルール
 
-- 変更を反映する場合は必ず `./scripts/build.sh` を実行
+- **変更後は必ず `./scripts/build.sh && ./scripts/deploy.sh` を1つのコマンドとして実行する。省略禁止。分けて実行しない。**
 - dist/ディレクトリはgitignore対象
 - .envファイルはgitignore対象（.env.exampleを参考）
 

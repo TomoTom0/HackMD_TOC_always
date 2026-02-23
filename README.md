@@ -16,7 +16,10 @@ TOC settings are integrated into HackMD's dropdown menu (top-right menu button):
 - **TOC Settings**: Open settings dialog
     - Change opacity
     - Change width
-    - Toggle expand/collapse
+    - Toggle visibility
+    - Expand Mode:
+      - **Always**: Always expand all sections
+      - **Auto**: Show h1/h2 always, expand h3+ only for active section
 
 ![](img/HackMDTOC_ss4.png)
 
@@ -66,6 +69,15 @@ hackmd-toc/
 ```
 
 ### Changes
+
+#### v1.5.0 (2026-02-24)
+- Add Expand Mode setting (Always/Auto)
+  - Always: Always expand all sections
+  - Auto: Show h1/h2 always, expand h3+ only for active section
+- Use custom CSS classes (chex-*) to avoid conflicts with HackMD styles
+- Improve dark mode: use light background for TOC in dark mode
+- Reduce font size for better readability
+- Fix selector syntax errors
 
 #### v1.4.0 (2025-02-21)
 - Generate TOC from headings (no longer depends on HackMD's existing TOC)

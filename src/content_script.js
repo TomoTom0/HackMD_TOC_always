@@ -1,6 +1,6 @@
 "use strict";
 
-const default_settings = { opacity: 0.5, hidden: false, width: 150, expand: true };
+const default_settings = { opacity: 0.5, hidden: false, width: 150, expandMode: "always" };
 
 const getSyncStorage = (key = null) => new Promise(resolve => {
     chrome.storage.sync.get(key || default_settings, resolve);
@@ -23,6 +23,47 @@ function setStyles(element, styles) {
             element.style[key] = value;
         });
     }
+}
+
+/**
+ * Flash highlight an element temporarily
+ * @param {HTMLElement} element - Element to highlight
+ * @param {number} duration - Duration in milliseconds (default: 1500)
+ */
+function flashHighlight(element, duration = 1500) {
+    if (!element) return;
+
+    const originalBackground = element.style.backgroundColor;
+    const originalTransition = element.style.transition;
+
+    element.style.transition = 'background-color 0.3s ease-in-out';
+    element.style.backgroundColor = 'rgba(255, 235, 59, 0.5)'; // Yellow highlight
+
+    setTimeout(() => {
+        element.style.backgroundColor = originalBackground;
+        setTimeout(() => {
+            element.style.transition = originalTransition;
+        }, 300);
+    }, duration);
+}
+
+/**
+ * Check if HackMD is in dark mode
+ * @returns {boolean}
+ */
+function isDarkMode() {
+    const body = document.body;
+    const bgColor = window.getComputedStyle(body).backgroundColor;
+    // Parse rgb(r, g, b) format
+    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        // If background is dark (all values < 128), it's dark mode
+        return r < 128 && g < 128 && b < 128;
+    }
+    return false;
 }
 
 function createElement(tag, options = {}) {
@@ -54,8 +95,15 @@ function createElement(tag, options = {}) {
         if (toc_out) {
             const mode = obtainMode();
             if (!mode.edit) return;
-            if (GLOBAL_settings.expand) toc_out.classList.add("expand");
-            else toc_out.classList.remove("expand");
+            if (GLOBAL_settings.expandMode === "always") {
+                toc_out.classList.add("chex-expand");
+                // Force all ul elements to be visible
+                $$('ul', toc_out).forEach(ul => {
+                    ul.style.display = 'block';
+                });
+            } else {
+                toc_out.classList.remove("chex-expand");
+            }
         }
     });
 
@@ -67,7 +115,7 @@ function createElement(tag, options = {}) {
     const observeTrigger = setInterval(() => {
         const toc_out = $("#toc_out_ChEx");
         if (toc_out) {
-            observer.observe(toc_out, { childList: true, attributes: true });
+            observer.observe(toc_out, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
             clearInterval(observeTrigger);
         }
     });
@@ -100,6 +148,7 @@ function createElement(tag, options = {}) {
                     menuLink.innerHTML = `<i class="ph ${icon}"></i> ${label}`;
                 }
             } else if (classList.contains('menu_openTOCSettings')) {
+                await updateModalTheme(GLOBAL_settings);
                 const modal = $(".tocAdjust-modal");
                 if (modal) {
                     modal.style.display = "block";
@@ -110,7 +159,7 @@ function createElement(tag, options = {}) {
             } else if (classList.contains('menu_adjustTOC_width')) {
                 GLOBAL_settings.width = GLOBAL_settings.width <= 150 ? GLOBAL_settings.width + 50 : 100;
             }
-            await remake_sampleTOC(GLOBAL_settings);
+            await updateModalTheme(GLOBAL_settings);
             const sidenav = $(".sidenav.main-sidenav");
             const sidenavMenu = $(".sidenav.sidenav-menu");
             if (sidenav) sidenav.classList.remove("in");
@@ -118,31 +167,29 @@ function createElement(tag, options = {}) {
         }
         // toc jump in edit mode
         const tocOut = $("#toc_out_ChEx");
-        if (tocOut && e.target.closest("#toc_out_ChEx") && mode.edit && !mode.view) {
+        if (tocOut && e.target.closest("#toc_out_ChEx")) {
             const anchor = e.target.closest("a");
             if (anchor) {
-                let line_num = 0;
-                // First, try to get data-startline from the anchor itself (set by generateTOCFromHeadings)
-                const anchorLine = anchor.getAttribute("data-startline");
-                if (anchorLine) {
-                    line_num = parseInt(anchorLine || '0');
-                } else {
-                    // Fallback: get from href target
-                    const href = anchor.getAttribute('href');
-                    if (href && href.startsWith('#')) {
-                        const href_id = href.substring(1);
-                        const targetElem = document.getElementById(href_id);
-                        if (targetElem) {
-                            line_num = parseInt(targetElem.getAttribute('data-startline') || '0');
+                const href = anchor.getAttribute('href');
+                if (href && href.startsWith('#')) {
+                    const href_id = href.substring(1);
+                    const targetElem = document.getElementById(href_id);
+                    if (targetElem) {
+                        // Flash highlight the target heading
+                        flashHighlight(targetElem);
+
+                        // In edit mode (not view mode), also scroll CodeMirror
+                        if (mode.edit && !mode.view) {
+                            const line_num = parseInt(targetElem.getAttribute('data-startline') || '0');
+                            if (line_num > 0) {
+                                const firstLine = $(".CodeMirror-line");
+                                if (firstLine) {
+                                    const lineHeight = firstLine.offsetHeight;
+                                    // data-startline is 1-based, so subtract 1 for 0-based calculation.
+                                    EditScroll((line_num - 1) * lineHeight);
+                                }
+                            }
                         }
-                    }
-                }
-                if (line_num > 0) {
-                    const firstLine = $(".CodeMirror-line");
-                    if (firstLine) {
-                        const lineHeight = firstLine.offsetHeight;
-                        // data-startline is 1-based, so subtract 1 for 0-based calculation.
-                        EditScroll((line_num - 1) * lineHeight);
                     }
                 }
             }
@@ -153,21 +200,27 @@ function createElement(tag, options = {}) {
                 modal.removeAttribute('style');
                 modal.classList.remove('in');
             }
-        } else if (classList && classList.contains('btn_opacity')) {
-            const IsPls = classList.contains('btn_opacityPls') ? 1 : -1;
+        } else if (e.target.closest('button.btn_opacity')) {
+            const btn = e.target.closest('button.btn_opacity');
+            const IsPls = btn.classList.contains('btn_opacityPls') ? 1 : -1;
             const opacityOrder = Math.min(4, Math.max(1, Math.floor(GLOBAL_settings.opacity / 0.25) + IsPls));
             GLOBAL_settings.opacity = opacityOrder * 0.25;
-            await remake_sampleTOC(GLOBAL_settings);
-        } else if (classList && classList.contains('btn_width')) {
-            const IsPls = classList.contains('btn_widthPls') ? 1 : -1;
+            await updateModalTheme(GLOBAL_settings);
+        } else if (e.target.closest('button.btn_width')) {
+            const btn = e.target.closest('button.btn_width');
+            const IsPls = btn.classList.contains('btn_widthPls') ? 1 : -1;
             const widthOrder = Math.min(4, Math.max(0, Math.floor((GLOBAL_settings.width - 80) / 30) + IsPls));
             GLOBAL_settings.width = widthOrder * 30 + 80;
-            await remake_sampleTOC(GLOBAL_settings);
+            await updateModalTheme(GLOBAL_settings);
         } else if (e.target.closest('button.btn_menuTOCShowHide')) {
             GLOBAL_settings.hidden = !GLOBAL_settings.hidden;
             const showSpan = $$('button.btn_menuTOCShowHide span')[0];
             if (showSpan) showSpan.textContent = GLOBAL_settings.hidden ? "SHOW/hide" : "show/HIDE";
-            await remake_sampleTOC(GLOBAL_settings);
+            await updateModalTheme(GLOBAL_settings);
+        } else if (e.target.closest('input.btn_expandMode')) {
+            const radio = e.target.closest('input.btn_expandMode');
+            GLOBAL_settings.expandMode = radio.value;
+            await updateModalTheme(GLOBAL_settings);
         }
     });
 })();
@@ -209,9 +262,139 @@ async function initialSetting() {
         if (headings.length > 0) {
             clearInterval(initialTocTrigger);
             await remake_TOC();
-            await remake_sampleTOC();
+            await updateModalTheme();
+            // Start scroll sync for active heading highlight
+            startScrollSync();
+            // Start theme watcher for dark mode support
+            startThemeWatcher();
         }
     }, 500);
+}
+
+/**
+ * Highlight current heading in TOC based on scroll position
+ */
+function startScrollSync() {
+    let ticking = false;
+
+    const updateActiveHeading = async () => {
+        const tocOut = $("#toc_out_ChEx");
+        if (!tocOut) return;
+
+        const GLOBAL_settings = await getSyncStorage();
+        const headings = $$("h1, h2, h3, h4, h5, h6", $(".markdown-body"));
+        if (headings.length === 0) return;
+
+        // Remove all active classes first
+        $$("li", tocOut).forEach(li => li.classList.remove("active"));
+
+        // Find the heading closest to the top of viewport
+        let activeHeading = null;
+        let minDistance = Infinity;
+
+        headings.forEach(heading => {
+            const rect = heading.getBoundingClientRect();
+            const distance = Math.abs(rect.top);
+            if (rect.top <= 100 && distance < minDistance) {
+                minDistance = distance;
+                activeHeading = heading;
+            }
+        });
+
+        if (activeHeading && activeHeading.id) {
+            // Find corresponding TOC item
+            const tocLink = $(`a[href="#${activeHeading.id}"]`, tocOut);
+            if (tocLink) {
+                const tocItem = tocLink.closest("li");
+                if (tocItem) tocItem.classList.add("active");
+            }
+        }
+
+        // Auto expand mode: expand only the active section (h3 and deeper)
+        if (GLOBAL_settings.expandMode === "auto") {
+            // First, ensure top-level ul and h2-level ul are always visible
+            const topLevelUl = tocOut.querySelector(":scope > ul");
+            if (topLevelUl) {
+                topLevelUl.style.display = 'block';
+                topLevelUl.querySelectorAll(":scope > li > ul").forEach(ul => {
+                    ul.style.display = 'block';
+                });
+            }
+
+            // Collapse all ul elements deeper than h2 level (h3, h4, etc.)
+            $$("ul ul ul", tocOut).forEach(ul => {
+                ul.style.display = 'none';
+            });
+
+            // Only expand path for h3 and deeper headings
+            if (activeHeading && activeHeading.id) {
+                const headingLevel = parseInt(activeHeading.tagName.substring(1));
+                // Only expand children if active heading is h3 or deeper
+                if (headingLevel >= 3) {
+                    const tocLink = $(`a[href="#${activeHeading.id}"]`, tocOut);
+                    if (tocLink) {
+                        // Find all ancestor ul elements and expand them
+                        let currentUl = tocLink.closest("ul");
+                        while (currentUl && currentUl !== tocOut) {
+                            // Only expand uls that are at h3 level or deeper
+                            const parentUl = currentUl.parentElement?.closest("ul");
+                            if (parentUl && parentUl !== topLevelUl) {
+                                // This is h3 or deeper level
+                                currentUl.style.display = 'block';
+                            }
+                            currentUl = parentUl;
+                        }
+                    }
+                }
+            }
+        }
+
+        ticking = false;
+    };
+
+    // Listen to scroll events on both CodeMirror and window
+    const codeMirrorScroll = $(".CodeMirror-scroll");
+    if (codeMirrorScroll) {
+        codeMirrorScroll.addEventListener("scroll", () => {
+            if (!ticking) {
+                requestAnimationFrame(updateActiveHeading);
+                ticking = true;
+            }
+        });
+    }
+
+    window.addEventListener("scroll", () => {
+        if (!ticking) {
+            requestAnimationFrame(updateActiveHeading);
+            ticking = true;
+        }
+    });
+}
+
+/**
+ * Watch for theme changes and update TOC colors
+ */
+function startThemeWatcher() {
+    let lastDarkMode = isDarkMode();
+
+    const themeObserver = new MutationObserver(async () => {
+        const currentDarkMode = isDarkMode();
+        if (currentDarkMode !== lastDarkMode) {
+            lastDarkMode = currentDarkMode;
+            await remake_TOC();
+            await updateModalTheme();
+        }
+    });
+
+    // Observe body and html for class/attribute changes
+    themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme']
+    });
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme']
+    });
 }
 
 function EditScroll(posTo = 0) {
@@ -271,7 +454,7 @@ function animateScrollElem(elem, posTo) {
     requestAnimationFrame(animation);
 }
 
-async function remake_sampleTOC(GLOBAL_settingsIn = null) {
+async function updateModalTheme(GLOBAL_settingsIn = null) {
     const GLOBAL_settings = GLOBAL_settingsIn || await getSyncStorage();
     const output_opacity = $$(".output_opacitySample")[0];
     const output_width = $$(".output_widthSample")[0];
@@ -281,13 +464,42 @@ async function remake_sampleTOC(GLOBAL_settingsIn = null) {
     const sampleTitle = $("#sampleTOCTitle");
     if (sampleTitle) sampleTitle.textContent = "# Sample" + (GLOBAL_settings.hidden ? ": Hidden" : "");
 
-    const sampleTOC = $(".toc-sample");
+    // Update modal dark class
+    const dark = isDarkMode();
+    const modal = $(".tocAdjust-modal");
+    if (modal) {
+        if (dark) {
+            modal.classList.add("dark");
+        } else {
+            modal.classList.remove("dark");
+        }
+    }
+
+    // Update expand mode radio buttons
+    const expandModeRadios = $$('input.btn_expandMode');
+    expandModeRadios.forEach(radio => {
+        radio.checked = (radio.value === GLOBAL_settings.expandMode);
+    });
+
+    // Update sample TOC expand state
+    const sampleTOC = $(".chex-toc-sample");
     if (sampleTOC) {
+        if (GLOBAL_settings.expandMode === "always") {
+            sampleTOC.classList.add("chex-expand");
+            $$('ul', sampleTOC).forEach(ul => {
+                ul.style.display = 'block';
+            });
+        } else {
+            sampleTOC.classList.remove("chex-expand");
+        }
         setStyles(sampleTOC, {
             width: `${GLOBAL_settings.width - 10}px`,
-            opacity: GLOBAL_settings.opacity
+            opacity: GLOBAL_settings.opacity,
+            background: dark ? '#f5f5f5' : 'white',
+            color: '#333'
         });
     }
+
     await remake_TOC(GLOBAL_settings);
     await setSyncStorage(GLOBAL_settings);
 }
@@ -303,7 +515,7 @@ function generateTOCFromHeadings() {
     const headings = $$("h1, h2, h3, h4, h5, h6", markdownBody);
     if (headings.length === 0) return null;
 
-    const ul = createElement("ul", { class: "nav" });
+    const ul = createElement("ul", { class: "chex-toc-list" });
     const stack = [{ ul, level: 0 }];
 
     headings.forEach(heading => {
@@ -340,7 +552,7 @@ function generateTOCFromHeadings() {
         currentContainer.appendChild(li);
 
         if (level < 6) {
-            const childUl = createElement("ul", { class: "nav" });
+            const childUl = createElement("ul", { class: "chex-toc-list" });
             li.appendChild(childUl);
             stack.push({ ul: childUl, level });
         }
@@ -372,9 +584,11 @@ async function remake_TOC(GLOBAL_settingsIn = null) {
     const tocNav = generateTOCFromHeadings();
     if (!tocNav) return;
 
+    const dark = isDarkMode();
     const css_dic = {
         maxHeight: '',
-        background: 'white',
+        background: dark ? '#f5f5f5' : 'white',
+        color: '#333',
         opacity: GLOBAL_settings.opacity.toString(),
         border: 'none',
         width: `${GLOBAL_settings.width - 10}px`,
@@ -383,7 +597,7 @@ async function remake_TOC(GLOBAL_settingsIn = null) {
     };
 
     const new_toc_out = createElement('div', {
-        class: 'toc' + (GLOBAL_settings.expand ? ' expand' : ''),
+        class: 'chex-toc' + (GLOBAL_settings.expandMode === "always" ? ' chex-expand' : '') + (dark ? ' chex-toc-dark' : ''),
         id: 'toc_out_ChEx',
         style: css_dic
     });
@@ -391,6 +605,27 @@ async function remake_TOC(GLOBAL_settingsIn = null) {
 
     div_toc.appendChild(new_toc_out);
     div_toc.style.height = new_toc_out.offsetHeight + 'px';
+
+    // Set initial expand state based on expandMode
+    if (GLOBAL_settings.expandMode === "always") {
+        // Force expand all ul elements
+        $$('ul', new_toc_out).forEach(ul => {
+            ul.style.display = 'block';
+        });
+    } else if (GLOBAL_settings.expandMode === "auto") {
+        // Show only h1 and h2 levels, collapse h3 and deeper
+        const topLevelUl = new_toc_out.querySelector(":scope > ul");
+        if (topLevelUl) {
+            topLevelUl.style.display = 'block';
+            topLevelUl.querySelectorAll(":scope > li > ul").forEach(ul => {
+                ul.style.display = 'block';
+            });
+        }
+        // Collapse all ul elements deeper than h2 level
+        $$("ul ul ul", new_toc_out).forEach(ul => {
+            ul.style.display = 'none';
+        });
+    }
 }
 
 async function addNaviButtons() {
@@ -444,97 +679,393 @@ async function addNaviButtons() {
 }
 
 function addModal() {
-    const rgba = "rgba(30,30,30,.93)";
-    const adjustHTML = [
-        `
-    <div>
-    <div class="h4">Opacity</div>
-    <button type="button" class="btn btn_opacityPls"><span aria-hidden="true" class="btn_opacityPls">+</span></button>
-    <button type="button" class="btn btn_opacityMns"><span aria-hidden="true" class="btn_opacityMns">-</span></button>
-    <span class="output_opacitySample h5"></span>
-    </div>
-    <br>
-    <div>
-    <div class="h4">Width</div>
-    <button type="button" class="btn btn_widthPls"><span aria-hidden="true" class="btn_widthPls">+</span></button>
-    <button type="button" class="btn btn_widthMns"><span aria-hidden="true" class="btn_widthMns">-</span></button>
-    <span class="output_widthSample h5"></span>
-    </div>
-    <br>
-    <div>
-    <div class="h4">Show / Hide</div>
-    <button type="button" class="btn btn_menuTOCShowHide"><span aria-hidden="true" class="btn_menuTOCShowHide">show/HIDE</span></button>
-    </div>
-    `,
-        `<div style="background: ${rgba}; height: 250px;">
-    <span class="h4" id="sampleTOCTitle" style="color: #EDA35E"># Sample</span>
-    <div class="toc_sample">
-        <div class="ui-toc-dropdown ui-affix-toc unselectable hidden-print" style="background-color: transparent; width: 200px; border: none; height: 170.4px; max-width: 200px; top:70px; visibility: visible;">
-        <div class="toc expand toc-sample" style="background: white; opacity: 0.5; border: none; width: 190px; height: auto; z-index: 100;">
-        <ul class="nav">
-        <li class="active"><a href="#" title="TOCSample" smoothhashscroll="">TOC Sample</a><ul class="nav">
-        <li><a href="#" title="Section" smoothhashscroll="">Section</a>
-        <ul class="nav">
-        <li><a href="#" title="Subsection" smoothhashscroll="">Subsection</a></li>
-        <li><a href="#" title="Subsection2" smoothhashscroll="">Subsection2</a></li>
-        </ul>
-        </li>
-        <li><a href="#" title="H2" smoothhashscroll="">H2</a>
-        <ul class="nav">
-        <li><a href="#" title="H3" smoothhashscroll="">H3</a></li>
-        <li><a href="#" title="H3" smoothhashscroll="">H3</a></li>
-        </ul>
-        </li>
-        </ul>
-        </li>
-        </ul>
-        </div></div>
-    </div>
-    </div>`
-    ];
-
+    // Modal container
     const div_modal = createElement('div', {
         class: 'modal fade tocAdjust-modal',
         id: 'tocAdjust-modal',
+        style: {
+            display: 'none',
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            zIndex: '1050',
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            overflow: 'auto'
+        },
         attr: { tabindex: '-1', role: 'dialog', 'aria-labelledby': 'myModalLabel', 'aria-hidden': 'true' }
     });
-    const div_modal2 = createElement('div', { class: 'modal-dialog modal-sm' });
+
+    // Modal dialog
+    const div_modal2 = createElement('div', {
+        class: 'modal-dialog modal-sm',
+        style: {
+            position: 'relative',
+            margin: '30px auto',
+            width: '450px',
+            maxWidth: '90vw'
+        }
+    });
+
+    // Modal content
     const div_modal3 = createElement('div', { class: 'modal-content' });
 
-    const mdoal_header = createElement('div', { class: 'modal-header' });
-    const closeBtn = createElement('button', {
-        class: 'close',
-        attr: { type: 'button', 'data-dismiss': 'modal', 'aria-label': 'Close' }
-    });
-    closeBtn.appendChild(createElement('span', {
-        attr: { 'aria-hidden': 'true' },
-        text: 'x'
-    }));
-    mdoal_header.appendChild(closeBtn);
-    mdoal_header.appendChild(createElement('h4', {
+    // Modal header
+    const modal_header = createElement('div', { class: 'modal-header' });
+
+    const modal_title = createElement('h4', {
         class: 'modal-title',
         id: 'myModalLabel',
         text: 'Adjust TOC'
-    }));
+    });
 
-    const modal_body = createElement('div', {
-        class: 'modal-body',
-        style: { color: 'black' }
+    const closeBtn = createElement('button', {
+        class: 'close',
+        attr: { type: 'button', 'data-dismiss': 'modal', 'aria-label': 'Close' },
+        html: '<span aria-hidden="true">&times;</span>'
     });
-    const adjustContent1 = createElement('div', {
-        class: 'col-sx-12 col-sm-6 pl-0 pr-0',
-        html: adjustHTML[0]
-    });
-    const adjustContent2 = createElement('div', {
-        class: 'col-sx-12 col-sm-6 pl-0 pr-0 flex flex-column',
-        html: adjustHTML[1]
-    });
-    modal_body.appendChild(adjustContent1);
-    modal_body.appendChild(adjustContent2);
 
-    div_modal3.appendChild(mdoal_header);
+    modal_header.appendChild(modal_title);
+    modal_header.appendChild(closeBtn);
+
+    // Modal body
+    const modal_body = createElement('div', { class: 'modal-body' });
+
+    // Controls section
+    const controlsSection = createElement('div', { class: 'controls-section' });
+
+    // Opacity control
+    const opacityGroup = createElement('div', { class: 'control-group' });
+    opacityGroup.innerHTML = `
+        <div class="control-label">Opacity</div>
+        <button type="button" class="btn btn_opacity btn_opacityPls">+</button>
+        <button type="button" class="btn btn_opacity btn_opacityMns">-</button>
+        <span class="output_opacitySample output-value"></span>
+    `;
+
+    // Width control
+    const widthGroup = createElement('div', { class: 'control-group' });
+    widthGroup.innerHTML = `
+        <div class="control-label">Width</div>
+        <button type="button" class="btn btn_width btn_widthPls">+</button>
+        <button type="button" class="btn btn_width btn_widthMns">-</button>
+        <span class="output_widthSample output-value"></span>
+    `;
+
+    // Show/Hide control
+    const showHideGroup = createElement('div', { class: 'control-group' });
+    showHideGroup.innerHTML = `
+        <div class="control-label">Visibility</div>
+        <button type="button" class="btn btn_menuTOCShowHide"><span>show/HIDE</span></button>
+    `;
+
+    // Expand mode control
+    const expandModeGroup = createElement('div', { class: 'control-group' });
+    expandModeGroup.innerHTML = `
+        <div class="control-label">Expand Mode</div>
+        <div class="expand-mode-options">
+            <label class="expand-mode-label">
+                <input type="radio" name="expandMode" value="always" class="btn_expandMode">
+                <span>Always</span>
+            </label>
+            <label class="expand-mode-label">
+                <input type="radio" name="expandMode" value="auto" class="btn_expandMode">
+                <span>Auto</span>
+            </label>
+        </div>
+    `;
+
+    controlsSection.appendChild(opacityGroup);
+    controlsSection.appendChild(widthGroup);
+    controlsSection.appendChild(showHideGroup);
+    controlsSection.appendChild(expandModeGroup);
+
+    // Sample TOC section
+    const sampleSection = createElement('div', { class: 'sample-section' });
+
+    const sampleTitle = createElement('div', {
+        id: 'sampleTOCTitle',
+        class: 'sample-title',
+        text: '# Sample'
+    });
+
+    const sampleTocContainer = createElement('div', { class: 'chex-toc-sample-container' });
+
+    const sampleToc = createElement('div', { class: 'chex-toc chex-expand chex-toc-sample' });
+
+    sampleToc.innerHTML = `
+        <ul class="chex-toc-list">
+            <li><a href="#">TOC Sample</a>
+                <ul class="chex-toc-list">
+                    <li><a href="#">Section</a>
+                        <ul class="chex-toc-list">
+                            <li><a href="#">Subsection</a></li>
+                            <li><a href="#">Subsection2</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#">H2</a>
+                        <ul class="chex-toc-list">
+                            <li><a href="#">H3</a></li>
+                            <li><a href="#">H3</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    `;
+
+    sampleTocContainer.appendChild(sampleToc);
+    sampleSection.appendChild(sampleTitle);
+    sampleSection.appendChild(sampleTocContainer);
+
+    // Row container
+    const rowContainer = createElement('div', {
+        style: { display: 'flex', gap: '15px' }
+    });
+
+    const leftCol = createElement('div', {
+        style: { flex: '0 0 45%' }
+    });
+    leftCol.appendChild(controlsSection);
+
+    const rightCol = createElement('div', {
+        style: { flex: '1' }
+    });
+    rightCol.appendChild(sampleSection);
+
+    rowContainer.appendChild(leftCol);
+    rowContainer.appendChild(rightCol);
+    modal_body.appendChild(rowContainer);
+
+    div_modal3.appendChild(modal_header);
     div_modal3.appendChild(modal_body);
     div_modal2.appendChild(div_modal3);
     div_modal.appendChild(div_modal2);
     document.body.prepend(div_modal);
+
+    injectTOCStyles();
+}
+
+function injectTOCStyles() {
+    const styleId = 'toc-hover-styles';
+    if (document.getElementById(styleId)) return;
+
+    const css = `
+        #toc_out_ChEx a {
+            color: inherit;
+            text-decoration: none;
+        }
+        #toc_out_ChEx a:hover {
+            color: #EDA35E !important;
+        }
+        #toc_out_ChEx.chex-toc-dark a:hover {
+            color: #FFD700 !important;
+        }
+        #toc_out_ChEx li.active > a {
+            color: #EDA35E !important;
+            font-weight: 500;
+        }
+        #toc_out_ChEx.chex-toc-dark li.active > a {
+            color: #FFD700 !important;
+        }
+        #toc_out_ChEx.chex-expand ul {
+            display: block !important;
+        }
+        /* TOC list styles */
+        #toc_out_ChEx {
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        #toc_out_ChEx .chex-toc-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+        #toc_out_ChEx .chex-toc-list .chex-toc-list {
+            padding-left: 10px;
+            margin: 1px 0;
+        }
+        #toc_out_ChEx .chex-toc-list li {
+            margin: 1px 0;
+        }
+        #toc_out_ChEx .chex-toc-list a {
+            display: block;
+            padding: 1px 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        /* Modal visibility */
+        .tocAdjust-modal.in {
+            display: block !important;
+        }
+        /* Modal - Light mode (default) */
+        .tocAdjust-modal .modal-content {
+            background: #fff;
+            color: #000;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            box-shadow: 0 3px 9px rgba(0, 0, 0, 0.5);
+        }
+        .tocAdjust-modal .modal-header {
+            padding: 15px;
+            border-bottom: 1px solid #e5e5e5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+        }
+        .tocAdjust-modal .modal-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 500;
+            color: #000;
+        }
+        .tocAdjust-modal .close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            color: #000;
+        }
+        .tocAdjust-modal .modal-body {
+            padding: 15px;
+        }
+        .tocAdjust-modal .controls-section {
+            margin-bottom: 15px;
+        }
+        .tocAdjust-modal .control-group {
+            margin-bottom: 12px;
+        }
+        .tocAdjust-modal .control-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #000;
+        }
+        .tocAdjust-modal .btn {
+            padding: 4px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: #fff;
+            color: #000;
+        }
+        .tocAdjust-modal .btn:hover {
+            background-color: #e6e6e6;
+        }
+        .tocAdjust-modal .output-value {
+            font-weight: 600;
+            color: #000;
+        }
+        .tocAdjust-modal .expand-mode-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .tocAdjust-modal .expand-mode-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .tocAdjust-modal .expand-mode-label input[type="radio"] {
+            margin: 0;
+            cursor: pointer;
+        }
+        .tocAdjust-modal .sample-section {
+            background: #e8e8e8;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .tocAdjust-modal .sample-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #b8860b;
+        }
+        .tocAdjust-modal .chex-toc-sample {
+            padding: 4px;
+            border-radius: 4px;
+            max-height: 180px;
+            overflow: auto;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .tocAdjust-modal .chex-toc-sample .chex-toc-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+        .tocAdjust-modal .chex-toc-sample .chex-toc-list .chex-toc-list {
+            padding-left: 10px;
+            margin: 1px 0;
+        }
+        .tocAdjust-modal .chex-toc-sample li {
+            margin: 1px 0;
+        }
+        .tocAdjust-modal .chex-toc-sample a {
+            text-decoration: none;
+            display: block;
+            padding: 1px 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        /* Modal - Dark mode */
+        .tocAdjust-modal.dark .modal-content {
+            background: #1e1e1e;
+            color: #f0f0f0;
+        }
+        .tocAdjust-modal.dark .modal-header {
+            border-bottom: 1px solid #444;
+            background: #1e1e1e;
+        }
+        .tocAdjust-modal.dark .modal-title {
+            color: #f0f0f0;
+        }
+        .tocAdjust-modal.dark .close {
+            color: #f0f0f0;
+        }
+        .tocAdjust-modal.dark .control-label {
+            color: #f0f0f0;
+        }
+        .tocAdjust-modal.dark .btn {
+            background: #333;
+            color: #f0f0f0;
+            border-color: #555;
+        }
+        .tocAdjust-modal.dark .btn:hover {
+            background-color: #444;
+        }
+        .tocAdjust-modal.dark .output-value {
+            color: #f0f0f0;
+        }
+        .tocAdjust-modal.dark .expand-mode-label {
+            color: #f0f0f0;
+        }
+        .tocAdjust-modal.dark .sample-section {
+            background: rgba(30,30,30,.93);
+        }
+        .tocAdjust-modal.dark .sample-title {
+            color: #EDA35E;
+        }
+        .tocAdjust-modal.dark .chex-toc-sample {
+            background: #f5f5f5;
+            color: #333;
+        }
+        .tocAdjust-modal.dark .chex-toc-sample a {
+            color: #333;
+        }
+    `;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = css;
+    document.head.appendChild(style);
 }

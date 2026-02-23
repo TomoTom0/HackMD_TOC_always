@@ -15,26 +15,20 @@ echo -e "${GREEN}Building HackMD TOC always extension...${NC}"
 rm -rf dist
 mkdir -p dist
 
-# Copy manifest.json
-echo "Copying manifest.json..."
-cp src/manifest.json dist/
-
-# Copy content scripts
-echo "Copying content scripts..."
-cp src/content_script.js dist/
-
-# Copy options page
-echo "Copying options page..."
-cp src/options.html dist/
-cp src/options_script.js dist/
+# Copy static files from public/
+echo "Copying static files from public/..."
+cp public/manifest.json dist/
+cp public/options.html dist/
 
 # Copy images
 echo "Copying images..."
 mkdir -p dist/img
-cp src/img/*.png dist/img/ 2>/dev/null || echo "  No PNG files found in src/img/"
+cp public/img/*.png dist/img/ 2>/dev/null || echo "  No PNG files found in public/img/"
 
-# Create source map for debugging (optional)
-# echo "Creating source maps..."
+# Copy source scripts
+echo "Copying source scripts..."
+cp src/content_script.js dist/
+cp src/options_script.js dist/
 
 echo -e "${GREEN}Build complete!${NC}"
 echo -e "${YELLOW}Load 'dist' directory in Chrome extensions (chrome://extensions)${NC}"
