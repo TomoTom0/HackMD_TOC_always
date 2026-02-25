@@ -1,0 +1,20 @@
+name: Check Branch Source
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-branch-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR is from dev branch
+        run: |
+          if [ "${{ github.head_ref }}" != "dev" ]; then
+            echo "エラー: main ブランチへのPRは dev ブランチからのみ許可されています。"
+            echo "現在のPR元ブランチ: ${{ github.head_ref }}"
+            exit 1
+          fi
+          echo "OK: PRは dev ブランチからです。"
+
