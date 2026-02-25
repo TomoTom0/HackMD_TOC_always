@@ -62,10 +62,17 @@ function flashHighlight(element, duration = 1500) {
  * @returns {boolean}
  */
 function isDarkMode() {
+    // Prefer checking for theme class/attribute for robustness
+    if (document.documentElement.classList.contains('ui-theme-dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark') {
+        return true;
+    }
+
+    // Fallback to computed style
     const body = document.body;
     const bgColor = window.getComputedStyle(body).backgroundColor;
-    // Parse rgb(r, g, b) format
-    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    // Parse rgb(a) format
+    const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
     if (match) {
         const r = parseInt(match[1]);
         const g = parseInt(match[2]);
@@ -243,8 +250,14 @@ function createElement(tag, options = {}) {
             if (!GLOBAL_settings.officialTOC) GLOBAL_settings.officialTOC = { ...default_settings.officialTOC };
             const IsPls = btn.classList.contains('btn_officialTOC_widthPls') ? 1 : -1;
             const currentWidth = GLOBAL_settings.officialTOC.width || 250;
-            const widthOrder = Math.min(6, Math.max(0, Math.floor((currentWidth - 150) / 50) + IsPls));
-            GLOBAL_settings.officialTOC.width = widthOrder * 50 + 150;
+            const widthOrder = Math.floor((currentWidth - 150) / 50) + IsPls;
+
+            if (widthOrder < 0) {
+                GLOBAL_settings.officialTOC.width = ""; // Reset to auto
+            } else {
+                const newWidthOrder = Math.min(6, widthOrder);
+                GLOBAL_settings.officialTOC.width = newWidthOrder * 50 + 150;
+            }
             await updateModalTheme(GLOBAL_settings);
         } else if (e.target.closest('input.btn_officialTOC_persist')) {
             const radio = e.target.closest('input.btn_officialTOC_persist');
@@ -290,12 +303,7 @@ function updateOfficialTOC(settings) {
  * Setup toggle button listener for persist mode
  */
 function setupOfficialTOCClassObserver() {
-    const checkToggleBtn = setInterval(() => {
-        const toggleBtn = $("#tocLabel");
-        if (!toggleBtn) return;
-
-        clearInterval(checkToggleBtn);
-
+    const setupListener = (toggleBtn) => {
         const officialTOC = $("#ui-toc");
         if (!officialTOC) return;
 
@@ -317,7 +325,21 @@ function setupOfficialTOCClassObserver() {
                 dropdown.classList.add('open');
             }
         }, true);
-    }, 500);
+    };
+
+    const toggleBtn = $("#tocLabel");
+    if (toggleBtn) {
+        setupListener(toggleBtn);
+    } else {
+        const observer = new MutationObserver((mutations, obs) => {
+            const btn = $("#tocLabel");
+            if (btn) {
+                setupListener(btn);
+                obs.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
 }
 
 /**
