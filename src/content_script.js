@@ -1,6 +1,16 @@
 "use strict";
 
-const default_settings = { opacity: 0.5, hidden: false, width: 150, expandMode: "always" };
+const default_settings = {
+    opacity: 0.5,
+    hidden: false,
+    width: 150,
+    expandMode: "always",
+    officialTOC: {
+        opacity: 1.0,
+        persist: true,
+        width: ""
+    }
+};
 
 const getSyncStorage = (key = null) => new Promise(resolve => {
     chrome.storage.sync.get(key || default_settings, resolve);
@@ -221,18 +231,121 @@ function createElement(tag, options = {}) {
             const radio = e.target.closest('input.btn_expandMode');
             GLOBAL_settings.expandMode = radio.value;
             await updateModalTheme(GLOBAL_settings);
+        } else if (e.target.closest('button.btn_officialTOC_opacity')) {
+            const btn = e.target.closest('button.btn_officialTOC_opacity');
+            if (!GLOBAL_settings.officialTOC) GLOBAL_settings.officialTOC = { ...default_settings.officialTOC };
+            const IsPls = btn.classList.contains('btn_officialTOC_opacityPls') ? 1 : -1;
+            const opacityOrder = Math.min(4, Math.max(1, Math.floor(GLOBAL_settings.officialTOC.opacity / 0.25) + IsPls));
+            GLOBAL_settings.officialTOC.opacity = opacityOrder * 0.25;
+            await updateModalTheme(GLOBAL_settings);
+        } else if (e.target.closest('button.btn_officialTOC_width')) {
+            const btn = e.target.closest('button.btn_officialTOC_width');
+            if (!GLOBAL_settings.officialTOC) GLOBAL_settings.officialTOC = { ...default_settings.officialTOC };
+            const IsPls = btn.classList.contains('btn_officialTOC_widthPls') ? 1 : -1;
+            const currentWidth = GLOBAL_settings.officialTOC.width || 250;
+            const widthOrder = Math.min(6, Math.max(0, Math.floor((currentWidth - 150) / 50) + IsPls));
+            GLOBAL_settings.officialTOC.width = widthOrder * 50 + 150;
+            await updateModalTheme(GLOBAL_settings);
+        } else if (e.target.closest('input.btn_officialTOC_persist')) {
+            const radio = e.target.closest('input.btn_officialTOC_persist');
+            if (!GLOBAL_settings.officialTOC) GLOBAL_settings.officialTOC = { ...default_settings.officialTOC };
+            GLOBAL_settings.officialTOC.persist = (radio.value === 'persist');
+            await updateModalTheme(GLOBAL_settings);
+        } else if (e.target.closest('.tab-btn')) {
+            const tabBtn = e.target.closest('.tab-btn');
+            const tabId = tabBtn.getAttribute('data-tab');
+            const modal = tabBtn.closest('.tocAdjust-modal');
+
+            // Update tab buttons
+            $$('.tab-btn', modal).forEach(btn => btn.classList.remove('active'));
+            tabBtn.classList.add('active');
+
+            // Update tab panes
+            $$('.tab-pane', modal).forEach(pane => pane.classList.remove('active'));
+            const activePane = $(`#tab-${tabId}`, modal);
+            if (activePane) activePane.classList.add('active');
         }
     });
 })();
 
+/**
+ * Update official TOC (#ui-toc) styles
+ * @param {Object} settings - Settings object with officialTOC property
+ */
+function updateOfficialTOC(settings) {
+    const officialTOC = $("#ui-toc");
+    if (!officialTOC) return;
+
+    const oSettings = settings.officialTOC || default_settings.officialTOC;
+
+    // Apply opacity
+    officialTOC.style.opacity = oSettings.opacity;
+
+    // Apply width only if value is set
+    officialTOC.style.width = oSettings.width !== "" ? `${oSettings.width}px` : "";
+    officialTOC.style.maxWidth = oSettings.width !== "" ? `${oSettings.width}px` : "";
+}
+
+/**
+ * Setup toggle button listener for persist mode
+ */
+function setupOfficialTOCClassObserver() {
+    const checkToggleBtn = setInterval(() => {
+        const toggleBtn = $("#tocLabel");
+        if (!toggleBtn) return;
+
+        clearInterval(checkToggleBtn);
+
+        const officialTOC = $("#ui-toc");
+        if (!officialTOC) return;
+
+        const dropdown = officialTOC.closest('.dropdown');
+        if (!dropdown) return;
+
+        toggleBtn.addEventListener("click", async (e) => {
+            const settings = await getSyncStorage();
+            if (!settings.officialTOC?.persist) return;
+
+            // In persist mode, use our own class to control visibility
+            e.stopPropagation();
+
+            if (officialTOC.classList.contains('chex-persist-open')) {
+                officialTOC.classList.remove('chex-persist-open');
+                dropdown.classList.remove('open');
+            } else {
+                officialTOC.classList.add('chex-persist-open');
+                dropdown.classList.add('open');
+            }
+        }, true);
+    }, 500);
+}
+
+/**
+ * Inject styles for official TOC control
+ */
+function injectOfficialTOCStyles() {
+    const styleId = 'official-toc-styles';
+    if (document.getElementById(styleId)) return;
+
+    const css = `
+        /* Persist mode: keep TOC visible even when clicking outside */
+        #ui-toc.chex-persist-open {
+            display: block !important;
+        }
+    `;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = css;
+    document.head.appendChild(style);
+}
+
 async function initialSetting() {
     const GLOBAL_settings = await getSyncStorage();
 
-    // Hide existing TOC
-    const existingTocAffix = $("#ui-toc-affix");
-    if (existingTocAffix) {
-        existingTocAffix.style.display = "none";
-    }
+    // Control official TOC
+    updateOfficialTOC(GLOBAL_settings);
+    setupOfficialTOCClassObserver();
 
     const cm = $(".CodeMirror-wrap");
     if (!cm) return;
@@ -253,6 +366,7 @@ async function initialSetting() {
     });
     scroll_ver.appendChild(div_toc);
 
+    injectOfficialTOCStyles();
     addModal();
     addNaviButtons();
 
@@ -501,7 +615,29 @@ async function updateModalTheme(GLOBAL_settingsIn = null) {
     }
 
     await remake_TOC(GLOBAL_settings);
+    updateOfficialTOC(GLOBAL_settings);
+    updateOfficialTOCModalDisplay(GLOBAL_settings);
     await setSyncStorage(GLOBAL_settings);
+}
+
+/**
+ * Update official TOC modal display values
+ * @param {Object} settings - Settings object with officialTOC property
+ */
+function updateOfficialTOCModalDisplay(settings) {
+    const oSettings = settings.officialTOC || default_settings.officialTOC;
+
+    const outputOpacity = $$(".output_officialTOC_opacity")[0];
+    const outputWidth = $$(".output_officialTOC_width")[0];
+
+    if (outputOpacity) outputOpacity.textContent = oSettings.opacity;
+    if (outputWidth) outputWidth.textContent = oSettings.width !== "" ? oSettings.width : "auto";
+
+    // Update persist radio buttons
+    const persistRadios = $$('input.btn_officialTOC_persist');
+    persistRadios.forEach(radio => {
+        radio.checked = (radio.value === 'persist') === oSettings.persist;
+    });
 }
 
 /**
@@ -703,7 +839,7 @@ function addModal() {
         style: {
             position: 'relative',
             margin: '30px auto',
-            width: '450px',
+            width: '520px',
             maxWidth: '90vw'
         }
     });
@@ -781,6 +917,47 @@ function addModal() {
     controlsSection.appendChild(showHideGroup);
     controlsSection.appendChild(expandModeGroup);
 
+    // Official TOC controls section (for separate tab)
+    const officialTOCSection = createElement('div', { class: 'controls-section official-toc-section' });
+
+    // Official TOC Opacity control
+    const officialOpacityGroup = createElement('div', { class: 'control-group' });
+    officialOpacityGroup.innerHTML = `
+        <div class="control-label">Opacity</div>
+        <button type="button" class="btn btn_officialTOC_opacity btn_officialTOC_opacityPls">+</button>
+        <button type="button" class="btn btn_officialTOC_opacity btn_officialTOC_opacityMns">-</button>
+        <span class="output_officialTOC_opacity output-value"></span>
+    `;
+
+    // Official TOC Width control
+    const officialWidthGroup = createElement('div', { class: 'control-group' });
+    officialWidthGroup.innerHTML = `
+        <div class="control-label">Width</div>
+        <button type="button" class="btn btn_officialTOC_width btn_officialTOC_widthPls">+</button>
+        <button type="button" class="btn btn_officialTOC_width btn_officialTOC_widthMns">-</button>
+        <span class="output_officialTOC_width output-value"></span>
+    `;
+
+    // Official TOC Show/Hide control
+    const officialShowHideGroup = createElement('div', { class: 'control-group' });
+    officialShowHideGroup.innerHTML = `
+        <div class="control-label">Visibility</div>
+        <div class="expand-mode-options">
+            <label class="expand-mode-label">
+                <input type="radio" name="officialTOC_persist" value="persist" class="btn_officialTOC_persist">
+                <span>Persist</span>
+            </label>
+            <label class="expand-mode-label">
+                <input type="radio" name="officialTOC_persist" value="auto" class="btn_officialTOC_persist">
+                <span>Auto</span>
+            </label>
+        </div>
+    `;
+
+    officialTOCSection.appendChild(officialOpacityGroup);
+    officialTOCSection.appendChild(officialWidthGroup);
+    officialTOCSection.appendChild(officialShowHideGroup);
+
     // Sample TOC section
     const sampleSection = createElement('div', { class: 'sample-section' });
 
@@ -819,24 +996,42 @@ function addModal() {
     sampleSection.appendChild(sampleTitle);
     sampleSection.appendChild(sampleTocContainer);
 
-    // Row container
+    // Tab header
+    const tabHeader = createElement('div', { class: 'tab-header' });
+    tabHeader.innerHTML = `
+        <button type="button" class="tab-btn active" data-tab="custom">Custom TOC</button>
+        <button type="button" class="tab-btn" data-tab="official">Official TOC</button>
+    `;
+
+    // Tab content container
+    const tabContent = createElement('div', { class: 'tab-content' });
+
+    // Custom TOC tab pane
+    const tabPaneCustom = createElement('div', { class: 'tab-pane active', id: 'tab-custom' });
     const rowContainer = createElement('div', {
         style: { display: 'flex', gap: '15px' }
     });
-
     const leftCol = createElement('div', {
         style: { flex: '0 0 45%' }
     });
     leftCol.appendChild(controlsSection);
-
     const rightCol = createElement('div', {
         style: { flex: '1' }
     });
     rightCol.appendChild(sampleSection);
-
     rowContainer.appendChild(leftCol);
     rowContainer.appendChild(rightCol);
-    modal_body.appendChild(rowContainer);
+    tabPaneCustom.appendChild(rowContainer);
+
+    // Official TOC tab pane
+    const tabPaneOfficial = createElement('div', { class: 'tab-pane', id: 'tab-official' });
+    tabPaneOfficial.appendChild(officialTOCSection);
+
+    tabContent.appendChild(tabPaneCustom);
+    tabContent.appendChild(tabPaneOfficial);
+
+    modal_body.appendChild(tabHeader);
+    modal_body.appendChild(tabContent);
 
     div_modal3.appendChild(modal_header);
     div_modal3.appendChild(modal_body);
@@ -899,6 +1094,38 @@ function injectTOCStyles() {
         /* Modal visibility */
         .tocAdjust-modal.in {
             display: block !important;
+        }
+        /* Tab styles */
+        .tocAdjust-modal .tab-header {
+            display: flex;
+            border-bottom: 1px solid #e5e5e5;
+            margin-bottom: 15px;
+        }
+        .tocAdjust-modal .tab-btn {
+            flex: 1;
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tocAdjust-modal .tab-btn:hover {
+            color: #333;
+            background: #f5f5f5;
+        }
+        .tocAdjust-modal .tab-btn.active {
+            color: #333;
+            border-bottom-color: #EDA35E;
+            font-weight: 500;
+        }
+        .tocAdjust-modal .tab-pane {
+            display: none;
+        }
+        .tocAdjust-modal .tab-pane.active {
+            display: block;
         }
         /* Modal - Light mode (default) */
         .tocAdjust-modal .modal-content {
@@ -1017,6 +1244,18 @@ function injectTOCStyles() {
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        /* Section header for official TOC */
+        .tocAdjust-modal .section-header {
+            margin-top: 15px;
+            margin-bottom: 8px;
+            border-top: 1px solid #e5e5e5;
+            padding-top: 12px;
+        }
+        .tocAdjust-modal .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+        }
         /* Modal - Dark mode */
         .tocAdjust-modal.dark .modal-content {
             background: #1e1e1e;
@@ -1061,6 +1300,26 @@ function injectTOCStyles() {
         }
         .tocAdjust-modal.dark .chex-toc-sample a {
             color: #333;
+        }
+        .tocAdjust-modal.dark .section-header {
+            border-top-color: #444;
+        }
+        .tocAdjust-modal.dark .section-title {
+            color: #aaa;
+        }
+        .tocAdjust-modal.dark .tab-header {
+            border-bottom-color: #444;
+        }
+        .tocAdjust-modal.dark .tab-btn {
+            color: #aaa;
+        }
+        .tocAdjust-modal.dark .tab-btn:hover {
+            color: #f0f0f0;
+            background: #333;
+        }
+        .tocAdjust-modal.dark .tab-btn.active {
+            color: #f0f0f0;
+            border-bottom-color: #FFD700;
         }
     `;
 

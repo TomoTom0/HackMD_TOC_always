@@ -14,12 +14,19 @@ You can move by clicking an item in TOC
 TOC settings are integrated into HackMD's dropdown menu (top-right menu button):
 - **Show/Hide TOC**: Toggle TOC visibility
 - **TOC Settings**: Open settings dialog
-    - Change opacity
-    - Change width
-    - Toggle visibility
-    - Expand Mode:
-      - **Always**: Always expand all sections
-      - **Auto**: Show h1/h2 always, expand h3+ only for active section
+    - **Custom TOC Tab**:
+        - Change opacity
+        - Change width
+        - Toggle visibility
+        - Expand Mode:
+            - **Always**: Always expand all sections
+            - **Auto**: Show h1/h2 always, expand h3+ only for active section
+    - **Official TOC Tab**:
+        - Opacity: Change HackMD's official TOC transparency
+        - Width: Change official TOC width
+        - Visibility:
+            - **Persist**: Keep TOC visible even when clicking outside (only toggle button closes it)
+            - **Auto**: Default HackMD behavior (clicking outside closes TOC)
 
 ![](img/HackMDTOC_ss4.png)
 
@@ -69,6 +76,13 @@ hackmd-toc/
 ```
 
 ### Changes
+
+#### v1.6.0 (2026-02-25)
+- Add Official TOC control feature (separate tab in settings)
+    - Opacity: Control HackMD's official TOC transparency
+    - Width: Change official TOC width
+    - Persist mode: Keep TOC visible even when clicking outside
+- Settings dialog now uses tabs to separate Custom TOC and Official TOC settings
 
 #### v1.5.0 (2026-02-24)
 - Add Expand Mode setting (Always/Auto)
